@@ -1,0 +1,971 @@
+<!DOCTYPE html>
+<!-- a mildly upset experience -->
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>census</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Cormorant+Garamond:ital,wght@0,300;0,400;1,300;1,400&display=swap" rel="stylesheet">
+<style>
+  :root { color-scheme: dark; }
+  * { margin:0; padding:0; box-sizing:border-box; }
+  html,body { width:100%; height:100%; overflow:hidden; background:#030409 !important; }
+  body { font-family:'Cormorant Garamond', serif; cursor:none; }
+
+  canvas#field { position:fixed; inset:0; display:block; }
+
+  #cursor { position:fixed; width:5px; height:5px; border-radius:50%;
+    background:rgba(235,232,255,.85); pointer-events:none; z-index:60;
+    transform:translate(-50%,-50%);
+    box-shadow:0 0 8px rgba(200,190,255,.5); }
+
+  /* ── opening ── */
+  #intro { position:fixed; inset:0; z-index:50; display:flex; flex-direction:column;
+    align-items:center; justify-content:center; text-align:center;
+    background:#030409; padding:2rem; transition:opacity 2.4s ease; }
+  #intro.gone { opacity:0; pointer-events:none; }
+  #intro .t { font-size:13px; letter-spacing:.55em; text-transform:lowercase;
+    color:rgba(220,214,245,.55); margin-bottom:2.6rem; padding-left:.55em;
+    opacity:0; animation:rise 2.2s ease .4s forwards; }
+  #intro .q { font-size:clamp(17px,2.4vw,23px); font-weight:300; font-style:italic;
+    letter-spacing:.12em; line-height:2.1; color:rgba(205,200,232,.78);
+    max-width:34em; opacity:0; animation:rise 2.4s ease 1.3s forwards; }
+  #intro .c { font-size:11px; letter-spacing:.4em; text-transform:lowercase;
+    color:rgba(190,185,220,.28); margin-top:3.4rem; padding-left:.4em;
+    opacity:0; animation:rise 2.4s ease 2.8s forwards, pulse 4s ease 5s infinite; }
+  @keyframes rise { from {opacity:0; transform:translateY(10px);} to {opacity:1; transform:translateY(0);} }
+  @keyframes pulse { 0%,100%{opacity:.28;} 50%{opacity:.12;} }
+
+  /* ── give / take ── */
+  #give { position:fixed; bottom:3.3rem; left:50%; transform:translateX(-50%);
+    z-index:40; display:flex; gap:2.6rem; opacity:0; transition:opacity 2s ease 1s;
+    pointer-events:none; }
+  #give.on { opacity:1; pointer-events:auto; }
+  #give span { font-size:11.5px; letter-spacing:.32em; text-transform:lowercase;
+    color:rgba(200,195,228,.34); cursor:none; transition:color .5s; padding:.4rem .2rem;
+    user-select:none; -webkit-user-select:none; }
+  #give span:hover { color:rgba(225,220,250,.75); }
+  #give span.take:hover { color:rgba(160,150,180,.6); }
+
+  #whisper { position:fixed; top:50%; left:50%; transform:translate(-50%,-50%);
+    z-index:30; font-style:italic; font-weight:300; font-size:15px;
+    letter-spacing:.22em; color:rgba(190,185,220,0); pointer-events:none;
+    transition:color 3s ease; text-align:center; }
+  #whisper.on { color:rgba(190,185,220,.3); }
+
+  /* ── watermark — centered bottom ── */
+  #wm { position:fixed; bottom:1.15rem; left:50%; transform:translateX(-50%);
+    z-index:40; font-size:10px; letter-spacing:.34em; text-transform:lowercase;
+    color:rgba(190,185,222,.22); pointer-events:none; white-space:nowrap;
+    padding-left:.34em; }
+
+  /* ── hidden panel (shift+p) ── */
+  #panel { position:fixed; top:1.2rem; right:1.4rem; z-index:55;
+    background:rgba(6,8,18,.78); border:.5px solid rgba(255,255,255,.07);
+    border-radius:10px; padding:.9rem 1.1rem; display:none; min-width:190px;
+    backdrop-filter:blur(10px); cursor:auto; }
+  #panel.on { display:block; }
+  #panel * { cursor:auto; }
+  #panel .pl { font-size:9px; letter-spacing:.28em; text-transform:uppercase;
+    color:rgba(185,180,225,.4); margin-bottom:.45rem; }
+  #panel .clock { font-family:ui-monospace, Menlo, monospace; font-size:20px;
+    color:rgba(220,215,248,.8); letter-spacing:.08em; margin-bottom:.85rem; }
+  #panel input[type=range] { width:100%; accent-color:#8b80c9; }
+  #panel .spd { font-family:ui-monospace, Menlo, monospace; font-size:11px;
+    color:rgba(200,195,230,.55); margin-top:.25rem; }
+  #panel .pop { font-family:ui-monospace, Menlo, monospace; font-size:10px;
+    color:rgba(170,165,200,.4); margin-top:.6rem; line-height:1.6; white-space:pre; }
+</style>
+</head>
+<body>
+
+<canvas id="field"></canvas>
+<div id="cursor"></div>
+
+<div id="intro">
+  <div class="t">census</div>
+  <div class="q">every second you are given is a small life.<br>
+  it will spend itself whether you watch or not.<br>
+  give generously anyway.</div>
+  <div class="c">touch anywhere to begin</div>
+</div>
+
+<div id="give">
+  <span data-act="s10">give ten seconds</span>
+  <span data-act="m1">give a minute</span>
+  <span data-act="h1">give an hour</span>
+  <span data-act="tm" class="take">take a minute</span>
+</div>
+
+<div id="whisper">the field is empty. give it time.</div>
+<div id="wm">a mildly upset experience</div>
+
+<div id="panel">
+  <div class="pl">only you can see this</div>
+  <div class="clock" id="pClock">0:00:00</div>
+  <div class="pl">time velocity</div>
+  <input type="range" id="pSpeed" min="1" max="10" step="1" value="1">
+  <div class="spd" id="pSpdVal">1x</div>
+  <div class="pop" id="pPop"></div>
+</div>
+
+<script>
+/* ═══════════════════════════════════════════════════════
+   census — a mildly upset experience
+   every second is a small life. the field is the clock.
+   ═══════════════════════════════════════════════════════ */
+
+const cv = document.getElementById('field');
+const cx = cv.getContext('2d');
+let W=0, H=0, DPR=1;
+function resize(){
+  DPR = Math.min(window.devicePixelRatio||1, 2);
+  W = window.innerWidth; H = window.innerHeight;
+  cv.width = W*DPR; cv.height = H*DPR;
+  cv.style.width = W+'px'; cv.style.height = H+'px';
+  cx.setTransform(DPR,0,0,DPR,0,0);
+}
+window.addEventListener('resize', resize); resize();
+
+const curEl = document.getElementById('cursor');
+const mouse = {x:-999, y:-999};
+window.addEventListener('mousemove', e=>{
+  mouse.x = e.clientX; mouse.y = e.clientY;
+  curEl.style.left = mouse.x+'px'; curEl.style.top = mouse.y+'px';
+});
+
+/* ═══════════════ state — time is real, the fairies portray it ═══════════════ */
+let remaining = 0;            // seconds left, fractional, wall-clock driven
+let maxEver   = 1;            // largest the census has ever been
+let speedMult = 1;
+let started   = false;
+let lastWall  = Date.now();
+let lastBreathDone = true;
+
+const SEC_CAP = 1400;         // visible seconds at once; beyond this, the rest wait in the dark
+
+const secF = [], minF = [], hrF = [];
+const ghosts = [], embers = [];
+
+function frac(){ return remaining<=0 ? 0 : Math.min(1, remaining/maxEver); }
+
+/* ═══════════════ glow sprites (hue-bucketed, pre-rendered) ═══════════════ */
+const SPRITES = {};
+function glowSprite(hue, sat){
+  hue = ((Math.round(hue/24)*24)%360+360)%360;
+  sat = Math.round(sat/20)*20;
+  const key = hue+'_'+sat;
+  if (SPRITES[key]) return SPRITES[key];
+  const s = 64, c = document.createElement('canvas');
+  c.width = c.height = s;
+  const g = c.getContext('2d');
+  const grad = g.createRadialGradient(s/2,s/2,0, s/2,s/2,s/2);
+  grad.addColorStop(0,   `hsla(${hue},${sat}%,84%,.9)`);
+  grad.addColorStop(0.22,`hsla(${hue},${sat}%,74%,.34)`);
+  grad.addColorStop(0.55,`hsla(${hue},${Math.round(sat*.8)}%,62%,.08)`);
+  grad.addColorStop(1,   `hsla(${hue},${Math.round(sat*.6)}%,55%,0)`);
+  g.fillStyle = grad; g.fillRect(0,0,s,s);
+  SPRITES[key] = c; return c;
+}
+
+/* ═══════════════ fairies ═══════════════ */
+const HUES = [262, 288, 318, 196, 168, 212, 340, 244, 52, 28];
+let uid = 0;
+function now(){ return performance.now()/1000; }
+
+function makeFairy(tier, quiet){
+  const f = {
+    id: uid++, tier,
+    x: W*0.04 + Math.random()*W*0.92,
+    y: H*0.04 + Math.random()*H*0.84,
+    vx:0, vy:0,
+    tx:0, ty:0, roamT:0,
+    hue: HUES[(Math.random()*HUES.length)|0],
+    hueDrift: (Math.random()*2-1)*14,           // slow personal iridescence
+    depth: 0.5 + Math.random()*0.5,
+    ph: Math.random()*Math.PI*2,
+    ph2: Math.random()*Math.PI*2,
+    tw: 0.7 + Math.random()*1.6,                // twinkle speed
+    rot: Math.random()*Math.PI,
+    rotV: (Math.random()*2-1)*0.1,
+    glintT: now() + 2 + Math.random()*14,       // next ignition flash
+    glint: 0,
+    flap: Math.random()*Math.PI*2,
+    birth: now(), born: quiet ? 1 : 0,
+    state:'alive', stT:0, target:null, ghostAt:false, dread:false,
+  };
+  f.tx = f.x; f.ty = f.y;
+  return f;
+}
+
+/* ── reconcile the visible field with the real number ── */
+let suppressCeremony = false;
+function reconcile(quiet){
+  const r = Math.max(0, Math.floor(remaining));
+  const tS = Math.min(r, SEC_CAP);
+  const tM = Math.floor(r/60);
+  const tH = Math.floor(r/3600);
+
+  // seconds
+  let aliveS = secF.filter(f=>f.state!=='dying').length;
+  while (aliveS < tS){ secF.push(makeFairy(0, quiet)); aliveS++; }
+  if (aliveS > tS){
+    let over = aliveS - tS;
+    for (let i=secF.length-1; i>=0 && over>0; i--){
+      if (secF[i].state!=='dying'){ secF.splice(i,1); over--; }
+    }
+  }
+  // minutes
+  while (minF.filter(f=>f.state==='alive').length < tM) minF.push(makeFairy(1, quiet));
+  {
+    let over = minF.filter(f=>f.state==='alive').length - tM;
+    for (let i=minF.length-1; i>=0 && over>0; i--){
+      if (minF[i].state==='alive'){ minF.splice(i,1); over--; }
+    }
+  }
+  // hours
+  while (hrF.filter(f=>f.state==='alive'||f.state==='surge'||f.state==='collapse').length < tH)
+    hrF.push(makeFairy(2, quiet));
+  {
+    let over = hrF.filter(f=>f.state==='alive').length - tH;
+    // only trim if no ceremony is owed (takes / silent jumps)
+    if (suppressCeremony || quiet){
+      for (let i=hrF.length-1; i>=0 && over>0; i--){
+        if (hrF[i].state==='alive'){ hrF.splice(i,1); over--; }
+      }
+    }
+  }
+}
+
+/* ═══════════════ deaths ═══════════════ */
+function secondDeath(){
+  const alive = secF.filter(f=>f.state!=='dying');
+  if (!alive.length) return;
+  const f = alive[(Math.random()*alive.length)|0];
+  f.state='dying'; f.stT=now(); f.target=null;
+  const d = Math.hypot(f.x-mouse.x, f.y-mouse.y);
+  if (d < 130){ f.target={x:mouse.x, y:mouse.y}; f.ghostAt=true; }
+  audio.tickNote();
+}
+
+function minuteDeath(){
+  const alive = minF.filter(f=>f.state==='alive');
+  if (!alive.length) return;
+  const f = alive[(Math.random()*alive.length)|0];
+  f.state='glitch'; f.stT=now();
+  audio.minuteBell();
+  setTimeout(()=>{ const i=minF.indexOf(f); if(i>-1) minF.splice(i,1); }, 460/speedMult);
+}
+
+let hourBusy = false;
+function hourDeath(){
+  const alive = hrF.filter(f=>f.state==='alive');
+  if (!alive.length || hourBusy) {
+    // owed but busy — trim quietly later via reconcile
+    return;
+  }
+  hourBusy = true;
+  const f = alive[0];
+  f.state='surge'; f.stT=now();
+  audio.hourSwell();
+  setTimeout(()=>{
+    f.state='collapse'; f.stT=now();
+    setTimeout(()=>{
+      const i=hrF.indexOf(f); if(i>-1) hrF.splice(i,1);
+      embers.push({x:f.x, y:f.y, t0:now()});
+      hourBusy = false;
+    }, 950/speedMult);
+  }, 1500/speedMult);
+}
+
+function killSec(f, x, y){
+  const i = secF.indexOf(f); if (i>-1) secF.splice(i,1);
+  if (f.ghostAt) ghosts.push({x, y, t0:now()});
+}
+
+/* ═══════════════ the clock — wall time, survives the tab ═══════════════ */
+function advance(){
+  const wall = Date.now();
+  let dt = (wall - lastWall)/1000;
+  lastWall = wall;
+  if (!started || dt<=0) return;
+
+  const elapsed = dt * speedMult;
+  const prev = remaining;
+  remaining = Math.max(0, remaining - elapsed);
+
+  const silent = dt > 3;   // returned from elsewhere — the field already grieved without us
+  if (silent){
+    suppressCeremony = true; reconcile(true); suppressCeremony = false;
+    if (prev>0 && remaining<=0 && !lastBreathDone){ lastBreathDone=true; audio.lastBreath(); }
+    return;
+  }
+
+  let sD = Math.floor(prev) - Math.floor(remaining);
+  let mD = Math.floor(prev/60) - Math.floor(remaining/60);
+  let hD = Math.floor(prev/3600) - Math.floor(remaining/3600);
+  while (sD-- > 0) secondDeath();
+  while (mD-- > 0) minuteDeath();
+  while (hD-- > 0) hourDeath();
+
+  reconcile(false);
+
+  // the hour's dread — it knows
+  const dreadOn = remaining >= 3600 && (remaining % 3600) <= 14;
+  hrF.forEach((f,i)=>{ f.dread = (i===0 && dreadOn && f.state==='alive'); });
+
+  if (prev>0 && remaining<=0 && !lastBreathDone){
+    lastBreathDone = true;
+    audio.lastBreath();
+  }
+}
+/* a background heartbeat so time and music keep moving when the tab is hidden */
+setInterval(advance, 1000);
+
+/* ═══════════════ buttons ═══════════════ */
+document.getElementById('give').addEventListener('click', e=>{
+  const act = e.target.dataset.act; if(!act) return;
+  if (act!=='tm') lastBreathDone = false;
+  if (act==='s10'){ remaining += 10;   audio.birthChime(0); }
+  if (act==='m1') { remaining += 60;   audio.birthChime(1); }
+  if (act==='h1') { remaining += 3600; audio.birthChime(2); }
+  if (act==='tm'){
+    if (remaining > 0){
+      remaining = Math.max(0, remaining - 60);
+      suppressCeremony = true; reconcile(true); suppressCeremony = false; // gone. no ceremony.
+      audio.taken();
+      if (remaining<=0) lastBreathDone = true; // a taking earns no last breath
+    }
+    return;
+  }
+  maxEver = Math.max(maxEver, remaining);
+  reconcile(false);
+});
+
+/* ═══════════════ audio — bright like hoppípolla, then the lights go out ═══════════════ */
+const audio = (()=>{
+  let ctx=null, master, comp, rev;
+  let droneG, shimmerG, fragileG, stringsBus;
+
+  /* Am — F — C — G, the hopeful loop */
+  const CHORDS = [
+    { bass:55.0,  notes:[220.00, 261.63, 329.63], top:[440.00, 523.25, 659.26] }, // Am
+    { bass:43.65, notes:[174.61, 220.00, 261.63], top:[349.23, 440.00, 523.25] }, // F
+    { bass:65.41, notes:[261.63, 329.63, 392.00], top:[523.25, 659.26, 783.99] }, // C
+    { bass:49.0,  notes:[196.00, 246.94, 293.66], top:[392.00, 493.88, 587.33] }, // G
+  ];
+  const TICKS = [523.25, 587.33, 659.26, 783.99, 880.0]; // C pentatonic, high felt register
+  let tickPos = 1;
+  let barIdx = 0, nextBarT = 0;
+
+  function impulse(sec, decay){
+    const rate = ctx.sampleRate, len = rate*sec;
+    const buf = ctx.createBuffer(2, len, rate);
+    for(let ch=0; ch<2; ch++){
+      const d = buf.getChannelData(ch);
+      for(let i=0;i<len;i++) d[i] = (Math.random()*2-1)*Math.pow(1-i/len, decay);
+    }
+    return buf;
+  }
+
+  function init(){
+    if (ctx) return;
+    ctx = new (window.AudioContext||window.webkitAudioContext)();
+    comp = ctx.createDynamicsCompressor();
+    comp.threshold.value = -20; comp.ratio.value = 4;
+    comp.connect(ctx.destination);
+    master = ctx.createGain(); master.gain.value = 0.72; master.connect(comp);
+    rev = ctx.createConvolver(); rev.buffer = impulse(4.4, 2.3);
+    const revG = ctx.createGain(); revG.gain.value = 0.6;
+    rev.connect(revG); revG.connect(master);
+    audio._rev = rev;
+
+    stringsBus = ctx.createGain(); stringsBus.gain.value = 1;
+    stringsBus.connect(rev); stringsBus.connect(master);
+
+    /* low drone — stays longest */
+    droneG = ctx.createGain(); droneG.gain.value = 0;
+    const d1 = ctx.createOscillator(); d1.type='sine'; d1.frequency.value=55;
+    const d2 = ctx.createOscillator(); d2.type='sine'; d2.frequency.value=110.4;
+    const dg2 = ctx.createGain(); dg2.gain.value=.35;
+    const lfo = ctx.createOscillator(); lfo.frequency.value=.06;
+    const lfoG = ctx.createGain(); lfoG.gain.value=.3;
+    lfo.connect(lfoG); lfoG.connect(droneG.gain);
+    d1.connect(droneG); d2.connect(dg2); dg2.connect(droneG);
+    droneG.connect(master); d1.start(); d2.start(); lfo.start();
+
+    /* shimmer bus */
+    shimmerG = ctx.createGain(); shimmerG.gain.value = 0;
+    shimmerG.connect(rev);
+
+    /* fragile end-tone */
+    fragileG = ctx.createGain(); fragileG.gain.value = 0;
+    const fo = ctx.createOscillator(); fo.type='sine'; fo.frequency.value=659.26;
+    const vib = ctx.createOscillator(); vib.frequency.value=4.1;
+    const vibG = ctx.createGain(); vibG.gain.value=2.6;
+    vib.connect(vibG); vibG.connect(fo.frequency);
+    fo.connect(fragileG); fragileG.connect(rev);
+    fo.start(); vib.start();
+
+    nextBarT = ctx.currentTime + 0.3;
+    setInterval(schedule, 140);
+    shimmerLoop();
+  }
+
+  /* ── instruments ── */
+  function piano(fq, t, vel){
+    const o1 = ctx.createOscillator(); o1.type='triangle'; o1.frequency.value=fq;
+    const o2 = ctx.createOscillator(); o2.type='sine'; o2.frequency.value=fq*2.0;
+    const g2 = ctx.createGain(); g2.gain.value=.18;
+    const f = ctx.createBiquadFilter(); f.type='lowpass'; f.frequency.value=2100; f.Q.value=.3;
+    const g = ctx.createGain();
+    g.gain.setValueAtTime(.0001,t);
+    g.gain.exponentialRampToValueAtTime(vel, t+.01);
+    g.gain.exponentialRampToValueAtTime(.0001, t+1.5);
+    o1.connect(f); o2.connect(g2); g2.connect(f); f.connect(g);
+    g.connect(master); g.connect(rev);
+    o1.start(t); o2.start(t); o1.stop(t+1.6); o2.stop(t+1.6);
+  }
+  function bass(fq, t, dur, vel){
+    const o = ctx.createOscillator(); o.type='sine'; o.frequency.value=fq;
+    const g = ctx.createGain();
+    g.gain.setValueAtTime(.0001,t);
+    g.gain.linearRampToValueAtTime(vel, t+.25);
+    g.gain.exponentialRampToValueAtTime(.0001, t+dur);
+    o.connect(g); g.connect(master);
+    o.start(t); o.stop(t+dur+.1);
+  }
+  function strings(notes, t, dur, vel){
+    const f = ctx.createBiquadFilter(); f.type='lowpass';
+    f.frequency.setValueAtTime(420,t);
+    f.frequency.linearRampToValueAtTime(900, t+dur*.55);
+    f.frequency.linearRampToValueAtTime(420, t+dur);
+    const g = ctx.createGain();
+    g.gain.setValueAtTime(.0001,t);
+    g.gain.linearRampToValueAtTime(vel, t+dur*.45);
+    g.gain.linearRampToValueAtTime(.0001, t+dur);
+    f.connect(g); g.connect(stringsBus);
+    notes.forEach(fq=>{
+      [0,1.4].forEach(det=>{
+        const o = ctx.createOscillator(); o.type='sawtooth';
+        o.frequency.value = fq; o.detune.value = det*4-2.8;
+        const og = ctx.createGain(); og.gain.value=.05;
+        o.connect(og); og.connect(f);
+        o.start(t); o.stop(t+dur+.1);
+      });
+    });
+  }
+  function bell(fq, t, vel, dur){
+    [1, 2.76].forEach((m,i)=>{
+      const o = ctx.createOscillator(); o.type='sine'; o.frequency.value=fq*m;
+      const g = ctx.createGain();
+      g.gain.setValueAtTime(.0001,t);
+      g.gain.exponentialRampToValueAtTime(i? vel*.3 : vel, t+.015);
+      g.gain.exponentialRampToValueAtTime(.0001, t+dur);
+      o.connect(g); g.connect(rev); g.connect(master);
+      o.start(t); o.stop(t+dur+.1);
+    });
+  }
+
+  /* ── the bar scheduler: bright when full, hollow when empty ── */
+  function schedule(){
+    if (!ctx) return;
+    const beat = 1/speedMult;
+    const barLen = 4*beat;
+    while (nextBarT < ctx.currentTime + 2.4){
+      scheduleBar(barIdx, nextBarT, beat);
+      nextBarT += barLen;
+      barIdx++;
+    }
+  }
+  function scheduleBar(i, t0, beat){
+    const fr = frac();
+    const total = remaining;
+    if (!started || total <= 0) return;
+    const ch = CHORDS[i % 4];
+
+    if (fr > 0.08) bass(ch.bass, t0, 4*beat, .16*Math.min(1,fr*2.2));
+
+    if (fr > 0.4) strings(ch.notes, t0, 4*beat, .55*((fr-.4)/.6));
+
+    /* piano — the hopeful engine; it loses notes as the field thins */
+    if (fr > 0.62){
+      // full arpeggio, eighth notes, hoppípolla lilt
+      const seq = [0,1,2,1, 0,2,1,2];
+      seq.forEach((n,k)=>{
+        const oct = (k===4||k===7) ? 2 : 1;
+        piano(ch.notes[n]*oct, t0 + k*beat/2, .11 + (k===0?.04:0));
+      });
+      if (Math.random()<.4) piano(ch.top[(Math.random()*3)|0], t0 + (2+((Math.random()*2)|0))*beat, .07);
+    } else if (fr > 0.34){
+      [0,1,2,1].forEach((n,k)=> piano(ch.notes[n], t0 + k*beat, .09));
+    } else if (fr > 0.13){
+      if (Math.random()<.75) piano(ch.notes[0], t0, .08);
+      if (Math.random()<.4)  piano(ch.notes[2], t0 + 2*beat, .06);
+    }
+    /* below .13 — the piano has left the room. drone, tick, fragile tone remain. */
+  }
+
+  function shimmerLoop(){
+    if (ctx){
+      const t = ctx.currentTime + 1 + Math.random()*5;
+      const o = ctx.createOscillator(); o.type='sine';
+      o.frequency.value = [1046.5, 1318.5, 1568, 1975.5][(Math.random()*4)|0];
+      const g = ctx.createGain(); g.gain.setValueAtTime(0,t);
+      g.gain.linearRampToValueAtTime(.04, t+.5);
+      g.gain.exponentialRampToValueAtTime(.0001, t+3.4);
+      o.connect(g); g.connect(shimmerG);
+      o.start(t); o.stop(t+3.6);
+    }
+    setTimeout(shimmerLoop, (2+Math.random()*6)*1000);
+  }
+
+  /* each second leaving — a felt pluck inside the key */
+  function tickNote(){
+    if(!ctx) return;
+    const t = ctx.currentTime + Math.random()*.015;
+    tickPos += (Math.random()<.6 ? 1 : -1);
+    tickPos = Math.max(0, Math.min(TICKS.length-1, tickPos));
+    const o = ctx.createOscillator(); o.type='triangle'; o.frequency.value=TICKS[tickPos];
+    const f = ctx.createBiquadFilter(); f.type='lowpass'; f.frequency.value=1300;
+    const g = ctx.createGain();
+    g.gain.setValueAtTime(.0001,t);
+    g.gain.exponentialRampToValueAtTime(.085, t+.01);
+    g.gain.exponentialRampToValueAtTime(.0001, t+.5);
+    o.connect(f); f.connect(g); g.connect(master); g.connect(rev);
+    o.start(t); o.stop(t+.55);
+  }
+
+  function minuteBell(){ if(ctx) bell(220, ctx.currentTime, .13, 2.8); }
+
+  function hourSwell(){
+    if(!ctx) return;
+    const t = ctx.currentTime;
+    const o = ctx.createOscillator(); o.type='sine';
+    o.frequency.setValueAtTime(41.2,t);
+    o.frequency.linearRampToValueAtTime(55, t+2.5);
+    const g = ctx.createGain();
+    g.gain.setValueAtTime(.0001,t);
+    g.gain.linearRampToValueAtTime(.42, t+1.4);
+    g.gain.exponentialRampToValueAtTime(.0001, t+4.8);
+    o.connect(g); g.connect(master);
+    o.start(t); o.stop(t+5);
+    master.gain.cancelScheduledValues(t);
+    master.gain.setValueAtTime(master.gain.value, t);
+    master.gain.linearRampToValueAtTime(.3, t+.8);
+    master.gain.linearRampToValueAtTime(.72, t+3.6);
+  }
+
+  function birthChime(tier){
+    if(!ctx) return;
+    const t = ctx.currentTime;
+    const base = [1318.5, 659.26, 329.63][tier];
+    bell(base, t, .06, 1.8);
+  }
+
+  function taken(){
+    if(!ctx) return;
+    const t = ctx.currentTime;
+    const o = ctx.createOscillator(); o.type='sine'; o.frequency.value=82;
+    const g = ctx.createGain();
+    g.gain.setValueAtTime(.0001,t);
+    g.gain.exponentialRampToValueAtTime(.09, t+.01);
+    g.gain.exponentialRampToValueAtTime(.0001, t+.2);
+    o.connect(g); g.connect(master); // dry. takings don't echo.
+    o.start(t); o.stop(t+.25);
+  }
+
+  function lastBreath(){
+    if(!ctx) return;
+    const t = ctx.currentTime + 1.0;   // one beat of silence first
+    const len = ctx.sampleRate*2.6;
+    const buf = ctx.createBuffer(1, len, ctx.sampleRate);
+    const d = buf.getChannelData(0);
+    for(let i=0;i<len;i++) d[i] = Math.random()*2-1;
+    const src = ctx.createBufferSource(); src.buffer = buf;
+    const f = ctx.createBiquadFilter(); f.type='bandpass'; f.Q.value=.7;
+    f.frequency.setValueAtTime(900,t);
+    f.frequency.exponentialRampToValueAtTime(260, t+2.4);
+    const g = ctx.createGain();
+    g.gain.setValueAtTime(.0001,t);
+    g.gain.linearRampToValueAtTime(.11, t+.7);
+    g.gain.exponentialRampToValueAtTime(.0001, t+2.5);
+    src.connect(f); f.connect(g); g.connect(rev); g.connect(master);
+    src.start(t); src.stop(t+2.6);
+  }
+
+  /* continuous voices follow the census */
+  function setArc(fr, total){
+    if(!ctx) return;
+    const t = ctx.currentTime;
+    const smooth=(lo,hi)=>Math.max(0,Math.min(1,(fr-lo)/(hi-lo)));
+    shimmerG.gain.setTargetAtTime(.9*smooth(.5,.85), t, 1.6);
+    droneG.gain.setTargetAtTime(total>0 ? .05 + .1*(1-smooth(.1,.5)) : 0, t, 1.8);
+    const fragile = total>0 && total<=75 ? .04*(1-total/75)+.012 : 0;
+    fragileG.gain.setTargetAtTime(fragile, t, 1.6);
+  }
+
+  return { init, tickNote, minuteBell, hourSwell, birthChime, taken, lastBreath, setArc,
+           ready:()=>!!ctx };
+})();
+
+/* ═══════════════ movement — alive, roaming, unhurried ═══════════════ */
+function drift(f, dt, t){
+  if (f.state==='dying' && f.target) return; // being carried to you
+  if (t > f.roamT){
+    f.roamT = t + 5 + Math.random()*11;
+    f.tx = W*0.04 + Math.random()*W*0.92;
+    f.ty = H*0.04 + Math.random()*H*0.82;
+  }
+  const steer = f.tier===0 ? 2.2 : f.tier===1 ? 3.0 : 2.4;
+  let ax = (f.tx-f.x)*0.0016*steer;
+  let ay = (f.ty-f.y)*0.0016*steer;
+  // flutter — smooth, layered, personal
+  ax += (Math.sin(t*f.tw*0.9+f.ph)*5 + Math.sin(t*0.31+f.ph2)*7) * 0.0045;
+  ay += (Math.cos(t*f.tw*0.7+f.ph2)*4 + Math.sin(t*0.23+f.ph)*6) * 0.0040;
+  f.vx += ax*dt*60; f.vy += ay*dt*60;
+  f.vx *= 0.965; f.vy *= 0.965;
+  const maxV = f.tier===0 ? 0.42 : f.tier===1 ? 0.55 : 0.42;
+  const sp = Math.hypot(f.vx, f.vy);
+  if (sp > maxV){ f.vx = f.vx/sp*maxV; f.vy = f.vy/sp*maxV; }
+  f.x += f.vx*dt*60; f.y += f.vy*dt*60;
+  f.rot += f.rotV*dt;
+}
+
+/* ═══════════════ drawing ═══════════════ */
+function ray(x, y, ang, len, w, color, alpha){
+  cx.globalAlpha = alpha;
+  cx.strokeStyle = color;
+  cx.lineWidth = w;
+  cx.lineCap = 'round';
+  cx.beginPath();
+  cx.moveTo(x - Math.cos(ang)*len, y - Math.sin(ang)*len);
+  cx.lineTo(x + Math.cos(ang)*len, y + Math.sin(ang)*len);
+  cx.stroke();
+}
+
+function easeOut(k){ return 1-Math.pow(1-k,3); }
+
+function drawSecond(f, t, fr){
+  const age = t - f.birth;
+  if (f.born < 1) f.born = Math.min(1, age/0.5);
+  let x=f.x, y=f.y, alpha = f.born;
+
+  if (f.state==='dying'){
+    const k = Math.min(1, (t-f.stT)/0.85);
+    if (f.target){ x = f.x+(f.target.x-f.x)*easeOut(k); y = f.y+(f.target.y-f.y)*easeOut(k); }
+    alpha *= 1-k;
+    if (k>0.85 && Math.random()<.45) alpha = 0;
+    if (k>=1){ killSec(f, x, y); return; }
+  }
+
+  const sat = 14 + fr*48;
+  const hue = (f.hue*fr + 222*(1-fr));
+  const twk = 0.55 + 0.45*Math.sin(t*f.tw*2.2 + f.ph);
+  const r = (0.6 + f.depth*0.9);
+
+  cx.globalAlpha = alpha * (0.35 + 0.55*twk) * (0.5+f.depth*.5);
+  const gl = 4 + f.depth*5;
+  cx.drawImage(glowSprite(hue, sat), x-gl, y-gl, gl*2, gl*2);
+
+  cx.globalAlpha = alpha * (0.5 + 0.5*twk);
+  cx.fillStyle = `hsla(${hue},${Math.min(30,sat)}%,95%,1)`;
+  cx.fillRect(x-r/2, y-r/2, r, r);
+}
+
+function drawMinute(f, t, fr){
+  const age = t - f.birth;
+  if (f.born < 1) f.born = Math.min(1, age/0.5);
+  let x=f.x, y=f.y, alpha=f.born, split=0;
+
+  if (f.state==='glitch'){
+    const k = Math.min(1, (t-f.stT)/0.46);
+    if (Math.random()<.3) return;            // dropped frames
+    x += (Math.random()-.5)*3.5; y += (Math.random()-.5)*3.5;
+    split = 2.4; alpha *= 1-k*.6;
+  }
+
+  const hue = ((f.hue + t*4*f.hueDrift/14)*fr + 226*(1-fr)) % 360;
+  const sat = 26 + fr*52;
+  const twk = 0.6 + 0.4*Math.sin(t*f.tw*1.6 + f.ph);
+  // ignition glints
+  if (t > f.glintT){ f.glint = 1; f.glintT = t + 4 + Math.random()*16; }
+  f.glint = Math.max(0, f.glint - 0.025);
+  const ig = f.glint;
+
+  const core = 1.6 + f.depth*1.2;
+  const glowR = (13 + f.depth*10) * (1+ig*.8);
+  const rayL  = (7 + f.depth*7) * (twk*.8 + .5 + ig*1.6);
+
+  cx.globalCompositeOperation = 'lighter';
+
+  if (split>0){
+    cx.globalAlpha = alpha*.4;
+    cx.drawImage(glowSprite(0,80),   x-glowR-split, y-glowR, glowR*2, glowR*2);
+    cx.drawImage(glowSprite(215,80), x-glowR+split, y-glowR, glowR*2, glowR*2);
+  }
+
+  cx.globalAlpha = alpha * (0.5+0.4*twk) * (0.6+f.depth*.4);
+  cx.drawImage(glowSprite(hue, sat), x-glowR, y-glowR, glowR*2, glowR*2);
+
+  /* prismatic cross rays */
+  const a = f.rot;
+  const cMain = `hsla(${hue},${sat+12}%,88%,1)`;
+  const cSide = `hsla(${(hue+60)%360},${sat+12}%,82%,1)`;
+  ray(x,y, a,            rayL,     1.0, cMain, alpha*(.45+.45*twk+ig*.4));
+  ray(x,y, a+Math.PI/2,  rayL*1.1, 1.0, cMain, alpha*(.45+.45*twk+ig*.4));
+  ray(x,y, a+Math.PI/4,  rayL*.5,  0.7, cSide, alpha*(.3+.3*twk));
+  ray(x,y, a-Math.PI/4,  rayL*.5,  0.7, cSide, alpha*(.3+.3*twk));
+  if (fr>0.45){ // the holographic fringe
+    ray(x,y, a+0.12, rayL*.9, 0.6, `hsla(${(hue+300)%360},70%,80%,1)`, alpha*.2);
+    ray(x,y, a+Math.PI/2+0.12, rayL, 0.6, `hsla(${(hue+120)%360},70%,80%,1)`, alpha*.2);
+  }
+
+  cx.globalAlpha = alpha;
+  cx.fillStyle = `hsla(${hue},30%,96%,1)`;
+  cx.beginPath(); cx.arc(x,y,core,0,7); cx.fill();
+
+  cx.globalCompositeOperation = 'source-over';
+  cx.globalAlpha = 1;
+}
+
+function drawHour(f, t, fr){
+  const age = t - f.birth;
+  if (f.born < 1) f.born = Math.min(1, age/0.6);
+  let x=f.x, y=f.y, alpha=f.born, split=0, scale=1, glowMul=1;
+
+  const st = t - f.stT;
+  if (f.state==='surge'){
+    const k = Math.min(1, st/1.5);
+    glowMul = 1 + k*3.4; scale = 1 + k*1.1; split = k*2;
+    if (k>0.25) lightNeighbours(f, k);
+  }
+  if (f.state==='collapse'){
+    const k = Math.min(1, st/0.95);
+    glowMul = (1-k)*4.4 + .1; scale = Math.max(0.05,1-k);
+    alpha *= 1-k*.65;
+  }
+  if (f.dread){
+    if (Math.random()<.07) return;
+    if (Math.random()<.18){ x += (Math.random()-.5)*2.4; y += (Math.random()-.5)*2.4; split = 1.8; }
+  }
+
+  const hue = ((f.hue + t*6)*fr + 228*(1-fr)) % 360;
+  const sat = 32 + fr*50;
+  const twk = 0.65 + 0.35*Math.sin(t*f.tw*1.3 + f.ph);
+  if (t > f.glintT){ f.glint = 1; f.glintT = t + 5 + Math.random()*14; }
+  f.glint = Math.max(0, f.glint - 0.02);
+  const ig = f.glint;
+
+  const core = (2.8 + f.depth*1.8) * scale;
+  const glowR = (26 + f.depth*16) * glowMul;
+  const baseL = (15 + f.depth*10) * scale * (1+ig*1.2);
+
+  cx.globalCompositeOperation = 'lighter';
+
+  if (split>0){
+    cx.globalAlpha = alpha*.4;
+    cx.drawImage(glowSprite(0,80),   x-glowR-split, y-glowR, glowR*2, glowR*2);
+    cx.drawImage(glowSprite(215,80), x-glowR+split, y-glowR, glowR*2, glowR*2);
+  }
+
+  cx.globalAlpha = alpha*(0.45+0.4*twk);
+  cx.drawImage(glowSprite(hue, sat), x-glowR, y-glowR, glowR*2, glowR*2);
+  cx.globalAlpha = alpha*0.3;
+  cx.drawImage(glowSprite((hue+40)%360, sat), x-glowR*.65, y-glowR*.65, glowR*1.3, glowR*1.3);
+
+  /* iridescent starburst — each ray its own colour, breathing */
+  const NR = 8;
+  for (let i=0;i<NR;i++){
+    const a2 = f.rot + i*Math.PI/ (NR/2);
+    const long = (i%4===0);
+    const L = baseL * (long?1.7:0.8) * (0.75 + 0.25*Math.sin(t*1.7+f.ph+i));
+    const rh = (hue + i*38 + t*24) % 360;
+    ray(x,y, a2, L, long?1.3:0.8, `hsla(${rh},${sat+18}%,85%,1)`, alpha*(.4+.4*twk+ig*.35));
+  }
+
+  /* wings — soft luminous strokes, slow flap */
+  f.flap += 0.016 * (f.state==='surge'?3.2:1);
+  const ws = (0.5 + Math.sin(f.flap)*0.32) * (f.state==='surge'?1.5:1) * scale;
+  for (const dir of [-1,1]){
+    for (const [w,al] of [[3.2,.07],[1.6,.14],[0.7,.3]]){
+      cx.globalAlpha = alpha*al;
+      cx.strokeStyle = `hsla(${(hue+20)%360},${sat}%,88%,1)`;
+      cx.lineWidth = w; cx.lineCap='round';
+      cx.beginPath();
+      cx.moveTo(x, y - core*0.4);
+      cx.bezierCurveTo(
+        x + dir*core*3.0, y - core*4.6*ws,
+        x + dir*core*6.2, y - core*2.0*ws,
+        x + dir*core*3.0, y + core*1.1);
+      cx.stroke();
+    }
+  }
+
+  /* orbiting satellites — tiny lives that love it */
+  for (let i=0;i<3;i++){
+    const oa = t*0.7 + f.ph + i*2.1;
+    const orx = x + Math.cos(oa)*(core*4+i*4);
+    const ory = y + Math.sin(oa)*(core*2.6+i*2.5);
+    cx.globalAlpha = alpha*.5*twk;
+    cx.fillStyle = `hsla(${(hue+i*70)%360},${sat}%,90%,1)`;
+    cx.fillRect(orx-.7, ory-.7, 1.4, 1.4);
+  }
+
+  cx.globalAlpha = alpha;
+  cx.fillStyle = `hsla(${hue},24%,97%,1)`;
+  cx.beginPath(); cx.arc(x,y,core,0,7); cx.fill();
+
+  cx.globalCompositeOperation = 'source-over';
+  cx.globalAlpha = 1;
+}
+
+function lightNeighbours(src, k){
+  for (const f of secF){
+    const d = Math.hypot(f.x-src.x, f.y-src.y);
+    if (d < 280 && d > 1){
+      cx.globalAlpha = (1-d/280)*0.3*k;
+      cx.drawImage(glowSprite(f.hue,60), f.x-12, f.y-12, 24, 24);
+      f.vx += (src.x-f.x)/d * 0.04; f.vy += (src.y-f.y)/d * 0.04;
+    }
+  }
+  cx.globalAlpha = 1;
+}
+
+/* ── grain ── */
+const grainC = document.createElement('canvas');
+grainC.width = 220; grainC.height = 140;
+const gctx = grainC.getContext('2d');
+let grainTick = 0;
+function grain(){
+  if (++grainTick % 3 === 0){
+    const img = gctx.createImageData(220,140);
+    for(let i=0;i<img.data.length;i+=4){
+      const v = Math.random()*255|0;
+      img.data[i]=img.data[i+1]=img.data[i+2]=v; img.data[i+3]=13;
+    }
+    gctx.putImageData(img,0,0);
+  }
+  cx.globalAlpha = .5;
+  cx.drawImage(grainC, 0, 0, W, H);
+  cx.globalAlpha = 1;
+}
+
+/* ═══════════════ main loop ═══════════════ */
+const whisperEl = document.getElementById('whisper');
+let whisperShown = false;
+let lastFrame = now();
+
+function frame(){
+  const t = now();
+  const dt = Math.min(0.05, t-lastFrame);
+  lastFrame = t;
+
+  advance();
+
+  const fr = frac();
+
+  cx.fillStyle = '#030409';
+  cx.fillRect(0,0,W,H);
+
+  /* aurora — alive only while they are */
+  if (fr > 0.02 && remaining > 0){
+    cx.globalCompositeOperation = 'lighter';
+    const blobs = [
+      [W*.25, H*.3, 300, 268],[W*.72, H*.5, 360, 200],[W*.5, H*.78, 320, 318]
+    ];
+    for(const [bx,by,br,bh] of blobs){
+      const g = cx.createRadialGradient(bx,by,0,bx,by,br);
+      g.addColorStop(0, `hsla(${bh},52%,42%,${0.055*fr})`);
+      g.addColorStop(1, 'transparent');
+      cx.fillStyle = g;
+      cx.fillRect(bx-br,by-br,br*2,br*2);
+    }
+    cx.globalCompositeOperation = 'source-over';
+  }
+
+  /* ghosts */
+  for (let i=ghosts.length-1;i>=0;i--){
+    const g = ghosts[i], age = t-g.t0, life = 50;
+    if (age>life){ ghosts.splice(i,1); continue; }
+    cx.globalAlpha = 0.10*(1-age/life);
+    cx.fillStyle = '#cdd0e8';
+    cx.fillRect(g.x-.6, g.y-.6, 1.2, 1.2);
+  }
+  cx.globalAlpha = 1;
+
+  /* embers */
+  for (let i=embers.length-1;i>=0;i--){
+    const e = embers[i], age = t-e.t0, life = 4.5;
+    if (age>life){ embers.splice(i,1); continue; }
+    cx.globalCompositeOperation='lighter';
+    cx.globalAlpha = 0.5*(1-age/life);
+    cx.drawImage(glowSprite(28,70), e.x-11, e.y-11, 22, 22);
+    cx.globalCompositeOperation='source-over';
+  }
+  cx.globalAlpha = 1;
+
+  for (const f of secF){ drift(f, dt, t); }
+  for (let i=secF.length-1;i>=0;i--) drawSecond(secF[i], t, fr);
+  for (const f of minF){ drift(f, dt, t); drawMinute(f, t, fr); }
+  for (const f of hrF){ drift(f, dt, t); drawHour(f, t, fr); }
+
+  grain();
+
+  const vg = cx.createRadialGradient(W/2,H/2,Math.min(W,H)*.36, W/2,H/2,Math.max(W,H)*.75);
+  vg.addColorStop(0,'transparent'); vg.addColorStop(1,'rgba(2,3,7,.5)');
+  cx.fillStyle = vg; cx.fillRect(0,0,W,H);
+
+  if (audio.ready()) audio.setArc(fr, remaining);
+
+  const shouldWhisper = started && remaining<=0;
+  if (shouldWhisper !== whisperShown){
+    whisperShown = shouldWhisper;
+    whisperEl.classList.toggle('on', shouldWhisper);
+  }
+
+  if (panelOn){
+    const r = Math.max(0, Math.floor(remaining));
+    const h = (r/3600)|0, m = ((r%3600)/60)|0, s = r%60;
+    document.getElementById('pClock').textContent =
+      h+':'+String(m).padStart(2,'0')+':'+String(s).padStart(2,'0');
+    document.getElementById('pPop').textContent =
+      `visible  s ${secF.length}  m ${minF.length}  h ${hrF.length}`+
+      (r>SEC_CAP ? `\nwaiting in the dark ${r-SEC_CAP}` : '')+
+      `\nghosts ${ghosts.length}`;
+  }
+
+  requestAnimationFrame(frame);
+}
+requestAnimationFrame(frame);
+
+/* ═══════════════ opening ═══════════════ */
+const intro = document.getElementById('intro');
+intro.addEventListener('click', ()=>{
+  audio.init();
+  intro.classList.add('gone');
+  document.getElementById('give').classList.add('on');
+  lastWall = Date.now();
+  started = true;
+}, {once:true});
+
+/* ═══════════════ hidden panel — shift+p ═══════════════ */
+let panelOn = false;
+const panel = document.getElementById('panel');
+window.addEventListener('keydown', e=>{
+  if (e.shiftKey && (e.key==='P'||e.key==='p')){
+    panelOn = !panelOn;
+    panel.classList.toggle('on', panelOn);
+  }
+});
+const spd = document.getElementById('pSpeed');
+spd.addEventListener('input', ()=>{
+  speedMult = parseInt(spd.value,10);
+  document.getElementById('pSpdVal').textContent = speedMult+'x';
+});
+
+/* a mildly upset experience */
+</script>
+</body>
+</html>
