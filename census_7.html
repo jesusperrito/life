@@ -1,0 +1,1671 @@
+<!DOCTYPE html>
+<!-- a mildly upset experience -->
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>life</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Cormorant+Garamond:ital,wght@0,300;0,400;1,300;1,400&display=swap" rel="stylesheet">
+<style>
+  :root { color-scheme: dark; }
+  * { margin:0; padding:0; box-sizing:border-box; }
+  html,body { width:100%; height:100%; overflow:hidden; background:#030409 !important; }
+  body { font-family:'Cormorant Garamond', serif; cursor:none; }
+
+  canvas#field { position:fixed; inset:0; display:block; }
+
+  /* iridescent cursor — alive everywhere, even over the opening */
+  #cursor { position:fixed; left:0; top:0; width:4px; height:4px; border-radius:50%;
+    pointer-events:none; z-index:80; will-change:transform; }
+
+  /* ── opening ── */
+  #intro { position:fixed; inset:0; z-index:50; display:flex; flex-direction:column;
+    align-items:center; justify-content:center; text-align:center;
+    background:#030409; padding:2rem; transition:opacity 2.4s ease; }
+  #intro.gone { opacity:0; pointer-events:none; }
+  #intro .t { font-size:13px; letter-spacing:.55em; text-transform:lowercase;
+    color:rgba(220,214,245,.55); margin-bottom:2.6rem; padding-left:.55em;
+    opacity:0; animation:rise 2.2s ease .4s forwards; }
+  #intro .q { font-size:clamp(17px,2.4vw,23px); font-weight:300; font-style:italic;
+    letter-spacing:.12em; line-height:2.1; color:rgba(205,200,232,.78);
+    max-width:34em; opacity:0; animation:rise 2.4s ease 1.3s forwards; }
+  #intro .setrow { margin-top:3.2rem; opacity:0; animation:rise 2.4s ease 2.6s forwards;
+    display:flex; flex-direction:column; align-items:center; gap:1.5rem; }
+  #intro .time { display:flex; align-items:baseline; gap:.55rem; }
+  #intro .time input { background:transparent; border:none;
+    border-bottom:.5px solid rgba(200,195,228,.22); outline:none;
+    font-family:'Cormorant Garamond', serif; font-weight:300;
+    font-size:24px; letter-spacing:.14em; color:rgba(218,213,245,.88);
+    text-align:center; width:2.4em; padding:.25rem 0 .3rem; cursor:none;
+    transition:border-color .5s; }
+  #intro .time input:focus { border-bottom-color:rgba(220,215,250,.5); }
+  #intro .time input::placeholder { color:rgba(190,185,220,.22); }
+  #intro .time .col { font-size:22px; color:rgba(190,185,220,.3); }
+  #intro .tlbl { font-size:9px; letter-spacing:.34em; text-transform:lowercase;
+    color:rgba(190,185,220,.24); margin-top:-.5rem; padding-left:.34em; }
+  #intro .begin { font-size:11px; letter-spacing:.42em; text-transform:lowercase;
+    color:rgba(190,185,220,.34); padding:.5rem 1rem .5rem 1.4rem; cursor:none;
+    transition:color .5s; user-select:none; -webkit-user-select:none;
+    animation:pulse 4.5s ease 5.5s infinite; }
+  #intro .begin:hover { color:rgba(228,224,252,.85); animation:none; }
+  @keyframes rise { from {opacity:0; transform:translateY(10px);} to {opacity:1; transform:translateY(0);} }
+  @keyframes pulse { 0%,100%{opacity:1;} 50%{opacity:.45;} }
+
+  /* ── give / take ── */
+  #give { position:fixed; bottom:3.3rem; left:50%; transform:translateX(-50%);
+    z-index:40; display:flex; gap:2.4rem; opacity:0; transition:opacity 2s ease 1s;
+    pointer-events:none; }
+  #give.on { opacity:1; pointer-events:auto; }
+  #give span { font-size:11.5px; letter-spacing:.32em; text-transform:lowercase;
+    color:rgba(200,195,228,.34); cursor:none; transition:color .5s; padding:.4rem .2rem;
+    user-select:none; -webkit-user-select:none; }
+  #give span:hover { color:rgba(225,220,250,.75); }
+  #give span.take:hover { color:rgba(160,150,180,.6); }
+  #give span.again { margin-left:1.2rem; color:rgba(170,165,200,.22); }
+  #give span.again:hover { color:rgba(190,185,222,.55); }
+
+  #whisper { position:fixed; top:50%; left:50%; transform:translate(-50%,-50%);
+    z-index:30; font-style:italic; font-weight:300; font-size:15px;
+    letter-spacing:.22em; color:rgba(190,185,220,0); pointer-events:none;
+    transition:color 3s ease; text-align:center; }
+  #whisper.on { color:rgba(190,185,220,.3); }
+
+  /* ── watermark — centered bottom ── */
+  #wm { position:fixed; bottom:1.15rem; left:50%; transform:translateX(-50%);
+    z-index:40; font-size:10px; letter-spacing:.34em; text-transform:lowercase;
+    color:rgba(190,185,222,.22); pointer-events:none; white-space:nowrap;
+    padding-left:.34em; }
+
+  /* ── hidden panel (shift+p) ── */
+  #panel { position:fixed; top:1.2rem; right:1.4rem; z-index:55;
+    background:rgba(6,8,18,.78); border:.5px solid rgba(255,255,255,.07);
+    border-radius:10px; padding:.9rem 1.1rem; display:none; min-width:200px;
+    backdrop-filter:blur(10px); cursor:auto; }
+  #panel.on { display:block; }
+  #panel * { cursor:auto; }
+  #panel .pl { font-size:9px; letter-spacing:.28em; text-transform:uppercase;
+    color:rgba(185,180,225,.4); margin-bottom:.4rem; margin-top:.7rem; }
+  #panel .pl:first-child { margin-top:0; }
+  #panel .clock { font-family:ui-monospace, Menlo, monospace; font-size:20px;
+    color:rgba(220,215,248,.8); letter-spacing:.08em; }
+  #panel input[type=range] { width:100%; accent-color:#8b80c9; }
+  #panel .v { font-family:ui-monospace, Menlo, monospace; font-size:11px;
+    color:rgba(200,195,230,.55); margin-top:.15rem; }
+  #panel .pop { font-family:ui-monospace, Menlo, monospace; font-size:10px;
+    color:rgba(170,165,200,.4); margin-top:.7rem; line-height:1.6; white-space:pre; }
+</style>
+</head>
+<body>
+
+<canvas id="field"></canvas>
+<div id="cursor"></div>
+
+<div id="intro">
+  <div class="t">life</div>
+  <div class="q">every second you are given is a small life.<br>
+  it will spend itself whether you watch or not.<br>
+  give generously anyway.</div>
+  <div class="setrow">
+    <div class="time">
+      <input id="tH" type="text" inputmode="numeric" maxlength="2" placeholder="00" autocomplete="off"><span class="col">:</span>
+      <input id="tM" type="text" inputmode="numeric" maxlength="2" placeholder="00" autocomplete="off"><span class="col">:</span>
+      <input id="tS" type="text" inputmode="numeric" maxlength="2" placeholder="00" autocomplete="off">
+    </div>
+    <div class="tlbl">hours · minutes · seconds</div>
+    <div class="begin" id="begin">let them live</div>
+  </div>
+</div>
+
+<div id="give">
+  <span data-act="s10">give ten seconds</span>
+  <span data-act="m1">give a minute</span>
+  <span data-act="h1">give an hour</span>
+  <span data-act="tm" class="take">take a minute</span>
+  <span data-act="again" class="again">begin again</span>
+</div>
+
+<div id="whisper">the field is empty. give it time.</div>
+<div id="wm">a mildly upset experience</div>
+
+<div id="panel">
+  <div class="pl">only you can see this</div>
+  <div class="clock" id="pClock">0:00:00</div>
+  <div class="pl">time velocity</div>
+  <input type="range" id="pSpeed" min="1" max="10" step="1" value="1">
+  <div class="v" id="pSpdVal">1x</div>
+  <div class="pl">hour intake</div>
+  <input type="range" id="pIntake" min="0" max="10" step="1" value="9">
+  <div class="v" id="pIntakeVal">9</div>
+  <div class="pl">grain</div>
+  <input type="range" id="pGrain" min="0" max="20" step="1" value="19">
+  <div class="v" id="pGrainVal">19</div>
+  <div class="pl">tick</div>
+  <input type="range" id="pTick" min="0" max="10" step="1" value="5">
+  <div class="v" id="pTickVal">5</div>
+  <div class="pl">choir</div>
+  <input type="range" id="pChoir" min="0" max="10" step="1" value="5">
+  <div class="v" id="pChoirVal">5</div>
+  <div class="pl">cello</div>
+  <input type="range" id="pCello" min="0" max="10" step="1" value="5">
+  <div class="v" id="pCelloVal">5</div>
+  <div class="pl">crackle</div>
+  <input type="range" id="pCrackle" min="0" max="10" step="1" value="3">
+  <div class="v" id="pCrackleVal">3</div>
+  <div class="pop" id="pPop"></div>
+</div>
+
+<script>
+/* ═══════════════════════════════════════════════════════
+   census — a mildly upset experience
+   every second is a small life. the field is the clock.
+   ═══════════════════════════════════════════════════════ */
+
+const cv = document.getElementById('field');
+const cx = cv.getContext('2d');
+let W=0, H=0, DPR=1, dprCap=2;
+function resize(){
+  DPR = Math.min(window.devicePixelRatio||1, dprCap);
+  W = window.innerWidth; H = window.innerHeight;
+  cv.width = W*DPR; cv.height = H*DPR;
+  cv.style.width = W+'px'; cv.style.height = H+'px';
+  cx.setTransform(DPR,0,0,DPR,0,0);
+}
+window.addEventListener('resize', resize); resize();
+
+/* ── iridescent cursor (DOM, lives above everything) ── */
+const curEl = document.getElementById('cursor');
+const mouse = {x:-999, y:-999, on:false};
+let curDirty = false;
+window.addEventListener('mousemove', e=>{
+  mouse.x = e.clientX; mouse.y = e.clientY; mouse.on = true;
+  curDirty = true;          // style is written once per frame, not per event
+});
+document.addEventListener('mouseleave', ()=>{ mouse.on=false; curEl.style.opacity=0; });
+document.addEventListener('mouseenter', ()=>{ curEl.style.opacity=1; });
+let curTick = 0;
+function cursorGlow(t){
+  if (curDirty){
+    curEl.style.transform = `translate3d(${mouse.x}px,${mouse.y}px,0) translate(-50%,-50%)`;
+    curDirty = false;
+  }
+  if (++curTick % 6 !== 0) return;   // colour drifts gently; position stays per-frame
+  const h = (t*46)%360;
+  curEl.style.background = `hsla(${h},45%,95%,.95)`;
+  curEl.style.boxShadow =
+    `0 0 9px 2px hsla(${h},80%,72%,.75), 0 0 22px 8px hsla(${(h+120)%360},75%,64%,.3)`;
+}
+
+/* ═══════════════ state ═══════════════ */
+let remaining = 0;
+let maxEver   = 1;
+let speedMult = 1;
+let intakeAmt = 9;
+const MIX = { choir:5, cello:5, crackle:3, tick:5 };   // panel-tunable voices
+
+/* ── auto quality — protects the frame rate, never the concept ── */
+let quality = 2;                 // 2 full · 1 medium · 0 light
+let fpsAcc = 0, fpsN = 0, fpsEval = 0, goodStreak = 0;
+function watchPerf(dt, t){
+  fpsAcc += dt; fpsN++;
+  if (t - fpsEval < 1.5) return;
+  const fps = fpsN / fpsAcc;
+  fpsAcc = 0; fpsN = 0; fpsEval = t;
+  if (fps < 42 && quality > 0){
+    quality--; goodStreak = 0;
+    dprCap = [1.15, 1.5, 2][quality]; resize();
+  } else if (fps > 56 && quality < 2){
+    if (++goodStreak >= 3){
+      quality++; goodStreak = 0;
+      dprCap = [1.15, 1.5, 2][quality]; resize();
+    }
+  } else goodStreak = 0;
+}
+let started   = false;
+let lastWall  = Date.now();
+let lastBreathDone = true;
+
+const SEC_CAP  = 1400;
+const MIN_CAP  = 72;     // visible minute-bursts; the rest wait in the dark
+const FOLLOW_N = 6;
+
+const secF = [], minF = [], hrF = [];
+const ghosts = [], embers = [], intake = [];
+
+function frac(){ return remaining<=0 ? 0 : Math.min(1, remaining/maxEver); }
+function now(){ return performance.now()/1000; }
+
+/* ═══════════════ sprites ═══════════════ */
+const SPRITES = {};
+function glowSprite(hue, sat, rough){
+  hue = ((Math.round(hue/24)*24)%360+360)%360;
+  sat = Math.round(sat/20)*20;
+  const key = hue+'_'+sat+(rough?'_r':'');
+  if (SPRITES[key]) return SPRITES[key];
+  const s = rough?96:64, c = document.createElement('canvas');
+  c.width = c.height = s;
+  const g = c.getContext('2d');
+  const grad = g.createRadialGradient(s/2,s/2,0, s/2,s/2,s/2);
+  grad.addColorStop(0,   `hsla(${hue},${sat}%,84%,.9)`);
+  grad.addColorStop(0.22,`hsla(${hue},${sat}%,74%,.34)`);
+  grad.addColorStop(0.55,`hsla(${hue},${Math.round(sat*.8)}%,62%,.08)`);
+  grad.addColorStop(1,   `hsla(${hue},${Math.round(sat*.6)}%,55%,0)`);
+  g.fillStyle = grad; g.fillRect(0,0,s,s);
+  if (rough){
+    g.globalCompositeOperation = 'destination-out';
+    for (let i=0;i<46;i++){
+      const a = Math.random()*Math.PI*2;
+      const d = s*0.16 + Math.random()*s*0.36;
+      const px = s/2+Math.cos(a)*d, py = s/2+Math.sin(a)*d;
+      const r = 1.5+Math.random()*4.5;
+      const hg = g.createRadialGradient(px,py,0,px,py,r);
+      hg.addColorStop(0, `rgba(0,0,0,${.12+Math.random()*.2})`);
+      hg.addColorStop(1, 'rgba(0,0,0,0)');
+      g.fillStyle = hg;
+      g.fillRect(px-r,py-r,r*2,r*2);
+    }
+    g.globalCompositeOperation = 'lighter';
+    for (let i=0;i<10;i++){
+      const a = Math.random()*Math.PI*2;
+      const d = s*0.2 + Math.random()*s*0.3;
+      const px = s/2+Math.cos(a)*d, py = s/2+Math.sin(a)*d;
+      const r = 2+Math.random()*5;
+      const hg = g.createRadialGradient(px,py,0,px,py,r);
+      hg.addColorStop(0, `hsla(${hue},${sat}%,80%,.12)`);
+      hg.addColorStop(1, 'transparent');
+      g.fillStyle = hg;
+      g.fillRect(px-r,py-r,r*2,r*2);
+    }
+  }
+  SPRITES[key] = c; return c;
+}
+
+/* a whole second-fairy baked into one sprite: glow + bright core. one draw call each. */
+function secSprite(hue, sat){
+  hue = ((Math.round(hue/24)*24)%360+360)%360;
+  sat = Math.round(sat/20)*20;
+  const key = 's'+hue+'_'+sat;
+  if (SPRITES[key]) return SPRITES[key];
+  const s = 32, c = document.createElement('canvas');
+  c.width = c.height = s;
+  const g = c.getContext('2d');
+  const grad = g.createRadialGradient(s/2,s/2,0, s/2,s/2,s/2);
+  grad.addColorStop(0,   `hsla(${hue},${sat}%,84%,.85)`);
+  grad.addColorStop(0.25,`hsla(${hue},${sat}%,72%,.3)`);
+  grad.addColorStop(0.6, `hsla(${hue},${Math.round(sat*.8)}%,60%,.07)`);
+  grad.addColorStop(1,   'transparent');
+  g.fillStyle = grad; g.fillRect(0,0,s,s);
+  g.fillStyle = `hsla(${hue},${Math.min(30,sat)}%,96%,1)`;
+  g.fillRect(s/2-1.2, s/2-1.2, 2.4, 2.4);
+  SPRITES[key] = c; return c;
+}
+
+/* ═══════════════ fairies ═══════════════ */
+const HUES = [262, 288, 318, 196, 168, 212, 340, 244, 52, 28];
+let uid = 0;
+
+function makeFairy(tier, quiet){
+  const f = {
+    id: uid++, tier,
+    x: W*0.04 + Math.random()*W*0.92,
+    y: H*0.04 + Math.random()*H*0.84,
+    vx:0, vy:0, tx:0, ty:0, roamT:0,
+    hue: HUES[(Math.random()*HUES.length)|0],
+    hueDrift: (Math.random()*2-1)*14,
+    depth: 0.5 + Math.random()*0.5,
+    ph: Math.random()*Math.PI*2,
+    ph2: Math.random()*Math.PI*2,
+    tw: 0.7 + Math.random()*1.6,
+    rot: Math.random()*Math.PI,
+    rotV: (Math.random()*2-1)*0.05,
+    glintT: now()+2+Math.random()*14, glint:0,
+    flap: Math.random()*Math.PI*2,
+    birth: now(), born: quiet?1:0,
+    state:'alive', stT:0, target:null, ghostAt:false, dread:false,
+    follower:false, followR: 22+Math.random()*30, followW: 0.25+Math.random()*0.4,
+    far: Math.random()<0.28,    // some wander past the edges
+  };
+  f.tx=f.x; f.ty=f.y;
+  if (tier>0){
+    /* a balanced burst: rays distributed around the full circle,
+       evenly seeded then jittered, with irregular lengths and broken outer segments */
+    const nRays = tier===1 ? 6 : 14;
+    f.rays = [];
+    for (let i=0;i<nRays;i++){
+      const segs = [];
+      const nSeg = 1+(Math.random()*2|0);
+      for (let s2=0;s2<nSeg;s2++){
+        segs.push({ a: 1.05+Math.random()*0.55, b: 0.1+Math.random()*0.2,
+                    off:(Math.random()*2-1)*1.2, w: 0.4+Math.random()*0.7 });
+      }
+      f.rays.push({
+        ang: (i/nRays)*Math.PI*2 + (Math.random()-.5)*0.5,
+        len: tier===1
+          ? (Math.random()<0.18 ? 1.05+Math.random()*0.3 : 0.45+Math.random()*0.45)
+          : (Math.random()<0.25 ? 1.35+Math.random()*0.6 : 0.45+Math.random()*0.6),
+        w: 0.7+Math.random()*0.9,
+        hueOff: (Math.random()*2-1)*50,
+        ph: Math.random()*Math.PI*2,
+        ph2: Math.random()*Math.PI*2,
+        fl: 5.5+Math.random()*7,          // cracker-stick flicker speed, per ray
+        segs,
+      });
+    }
+    f.flecks = [];
+    const nf = tier===1 ? 5 : 9;
+    for (let i=0;i<nf;i++){
+      f.flecks.push({
+        a: Math.random()*Math.PI*2,
+        d: 1.3+Math.random()*1.7,
+        l: 1.5+Math.random()*3.5,
+        w: 0.4+Math.random()*0.8,
+        ph: Math.random()*Math.PI*2,
+      });
+    }
+  }
+  return f;
+}
+
+/* ── reconcile visible field with the real number ── */
+let suppressCeremony = false;
+function reconcile(quiet){
+  const r = Math.max(0, Math.floor(remaining));
+  const tS = Math.min(r, SEC_CAP);
+  const tM = Math.min(Math.floor(r/60), MIN_CAP);
+  const tH = Math.floor(r/3600);
+
+  let aliveS = secF.filter(f=>f.state!=='dying').length;
+  while (aliveS < tS){ secF.push(makeFairy(0, quiet)); aliveS++; }
+  if (aliveS > tS){
+    let over = aliveS - tS;
+    for (let i=0; i<secF.length && over>0; ){
+      if (secF[i].state!=='dying'){ secF.splice(i,1); over--; } else i++;
+    }
+  }
+  while (minF.filter(f=>f.state==='alive').length < tM) minF.push(makeFairy(1, quiet));
+  {
+    let over = minF.filter(f=>f.state==='alive').length - tM;
+    for (let i=minF.length-1; i>=0 && over>0; i--){
+      if (minF[i].state==='alive'){ minF.splice(i,1); over--; }
+    }
+  }
+  while (hrF.filter(f=>f.state!=='collapse').length < tH) hrF.push(makeFairy(2, quiet));
+  if (suppressCeremony || quiet){
+    let over = hrF.filter(f=>f.state==='alive').length - tH;
+    for (let i=hrF.length-1; i>=0 && over>0; i--){
+      if (hrF[i].state==='alive'){ hrF.splice(i,1); over--; }
+    }
+  }
+}
+
+function refreshFollowers(){
+  const cur = secF.filter(f=>f.follower && f.state!=='dying');
+  let need = FOLLOW_N - cur.length;
+  if (need<=0) return;
+  const cand = secF.filter(f=>!f.follower && f.state!=='dying');
+  while (need>0 && cand.length){
+    const f = cand.splice((Math.random()*cand.length)|0,1)[0];
+    f.follower = true; need--;
+  }
+}
+
+/* ═══════════════ deaths ═══════════════ */
+function secondDeath(){
+  const alive = secF.filter(f=>f.state!=='dying');
+  if (!alive.length) return;
+  const f = alive[(Math.random()*alive.length)|0];
+  f.state='dying'; f.stT=now(); f.target=null;
+  const d = Math.hypot(f.x-mouse.x, f.y-mouse.y);
+  if (mouse.on && d < 130){ f.target={x:mouse.x, y:mouse.y}; f.ghostAt=true; }
+  audio.tickNote();
+}
+function minuteDeath(){
+  const alive = minF.filter(f=>f.state==='alive');
+  if (!alive.length) return;
+  const f = alive[(Math.random()*alive.length)|0];
+  f.state='glitch'; f.stT=now();
+  audio.minuteBell();
+  setTimeout(()=>{ const i=minF.indexOf(f); if(i>-1) minF.splice(i,1); }, 460/speedMult);
+}
+let hourBusy = false;
+function hourDeath(){
+  const alive = hrF.filter(f=>f.state==='alive');
+  if (!alive.length || hourBusy) return;
+  hourBusy = true;
+  const f = alive[0];
+  f.state='surge'; f.stT=now();
+  audio.hourSwell();
+  setTimeout(()=>{
+    f.state='collapse'; f.stT=now();
+    setTimeout(()=>{
+      const i=hrF.indexOf(f); if(i>-1) hrF.splice(i,1);
+      embers.push({x:f.x, y:f.y, t0:now()});
+      hourBusy = false;
+    }, 950/speedMult);
+  }, 1500/speedMult);
+}
+function killSec(f, x, y){
+  const i = secF.indexOf(f); if (i>-1) secF.splice(i,1);
+  if (f.ghostAt) ghosts.push({x, y, t0:now()});
+}
+
+/* ═══════════════ the clock — wall time, survives the tab ═══════════════ */
+function advance(){
+  const wall = Date.now();
+  const dt = (wall - lastWall)/1000;
+  lastWall = wall;
+  if (!started || dt<=0) return;
+
+  const prev = remaining;
+  remaining = Math.max(0, remaining - dt*speedMult);
+
+  const silent = dt > 3;
+  if (silent){
+    suppressCeremony = true; reconcile(true); suppressCeremony = false;
+    if (prev>0 && remaining<=0 && !lastBreathDone){ lastBreathDone=true; audio.farewell(); }
+    return;
+  }
+
+  let sD = Math.floor(prev) - Math.floor(remaining);
+  let mD = Math.floor(prev/60) - Math.floor(remaining/60);
+  let hD = Math.floor(prev/3600) - Math.floor(remaining/3600);
+  if (sD<=0 && mD<=0 && hD<=0) return;     // nothing crossed — skip the bookkeeping
+  while (sD-- > 0) secondDeath();
+  while (mD-- > 0) minuteDeath();
+  while (hD-- > 0) hourDeath();
+
+  reconcile(false);
+  refreshFollowers();
+
+  const dreadOn = remaining >= 3600 && (remaining % 3600) <= 14;
+  hrF.forEach((f,i)=>{ f.dread = (i===0 && dreadOn && f.state==='alive'); });
+
+  if (prev>0 && remaining<=0 && !lastBreathDone){
+    lastBreathDone = true;
+    audio.farewell();
+  }
+}
+setInterval(advance, 1000);
+
+/* ═══════════════ the click — giving and taking by touch ═══════════════
+   empty dark: a second is born where you touched.
+   touching a life: it is taken. no ceremony. */
+cv.addEventListener('click', ()=>{
+  if (!started) return;
+  const mx = mouse.x, my = mouse.y;
+
+  for (const f of hrF){
+    if (f.state==='alive' && Math.hypot(f.x-mx, f.y-my) < 30){
+      remaining = Math.max(0, remaining - 3600);
+      const i = hrF.indexOf(f); hrF.splice(i,1);
+      suppressCeremony = true; reconcile(true); suppressCeremony = false;
+      audio.taken();
+      if (remaining<=0) lastBreathDone = true;
+      return;
+    }
+  }
+  for (const f of minF){
+    if (f.state==='alive' && Math.hypot(f.x-mx, f.y-my) < 16){
+      remaining = Math.max(0, remaining - 60);
+      const i = minF.indexOf(f); minF.splice(i,1);
+      suppressCeremony = true; reconcile(true); suppressCeremony = false;
+      audio.taken();
+      if (remaining<=0) lastBreathDone = true;
+      return;
+    }
+  }
+  for (const f of secF){
+    if (f.state!=='dying' && Math.hypot(f.x-mx, f.y-my) < 9){
+      remaining = Math.max(0, remaining - 1);
+      const i = secF.indexOf(f); secF.splice(i,1);
+      suppressCeremony = true; reconcile(true); suppressCeremony = false;
+      audio.taken();
+      if (remaining<=0) lastBreathDone = true;
+      return;
+    }
+  }
+
+  /* nothing under the finger — a second is given, born right there */
+  remaining += 1;
+  maxEver = Math.max(maxEver, remaining);
+  lastBreathDone = false;
+  const nf = makeFairy(0, false);
+  nf.x = mx; nf.y = my; nf.tx = mx; nf.ty = my;
+  secF.push(nf);
+  suppressCeremony = true; reconcile(true); suppressCeremony = false;
+  audio.birthChime(0);
+});
+
+/* ═══════════════ give / take / begin again ═══════════════ */
+document.getElementById('give').addEventListener('click', e=>{
+  const act = e.target.dataset.act; if(!act) return;
+  if (act==='again'){
+    /* a wipe — the field is emptied where it stands. no ceremony, no opening. */
+    remaining = 0; maxEver = 1; lastBreathDone = true;
+    secF.length=0; minF.length=0; hrF.length=0;
+    ghosts.length=0; embers.length=0; intake.length=0;
+    hourBusy = false;
+    return;
+  }
+  if (act!=='tm') lastBreathDone = false;
+  if (act==='s10'){ remaining += 10;   audio.birthChime(0); }
+  if (act==='m1') { remaining += 60;   audio.birthChime(1); }
+  if (act==='h1') { remaining += 3600; audio.birthChime(2); }
+  if (act==='tm'){
+    if (remaining > 0){
+      remaining = Math.max(0, remaining - 60);
+      suppressCeremony = true; reconcile(true); suppressCeremony = false;
+      audio.taken();
+      if (remaining<=0) lastBreathDone = true;
+    }
+    return;
+  }
+  maxEver = Math.max(maxEver, remaining);
+  reconcile(false);
+  refreshFollowers();
+});
+
+/* ═══════════════ audio ═══════════════ */
+const audio = (()=>{
+  let ctx=null, master, comp, rev, dlyIn;
+  let droneG, shimmerG, fragileG, stringsBus, choirBus, celloBus, crackleG;
+
+  /* the harmonic vocabulary — all in A minor, but the road wanders */
+  const CH = {
+    Am:{ bass:55.00, notes:[220.00, 261.63, 329.63], top:[440.00, 523.25, 659.26] },
+    F :{ bass:43.65, notes:[174.61, 220.00, 261.63], top:[349.23, 440.00, 523.25] },
+    C :{ bass:65.41, notes:[261.63, 329.63, 392.00], top:[523.25, 659.26, 783.99] },
+    G :{ bass:49.00, notes:[196.00, 246.94, 293.66], top:[392.00, 493.88, 587.33] },
+    Em:{ bass:41.20, notes:[164.81, 196.00, 246.94], top:[329.63, 392.00, 493.88] },
+    Dm:{ bass:36.71, notes:[146.83, 174.61, 220.00], top:[293.66, 349.23, 440.00] },
+  };
+  const PROGS = [
+    ['Am','F','C','G'],
+    ['F','G','Am','Em'],
+    ['Am','Em','F','G'],
+    ['C','G','Dm','Am'],
+    ['Dm','Am','G','F'],
+    ['Am','C','F','Em'],
+  ];
+  const ARPS = [
+    [0,1,2,1, 0,2,1,2],
+    [0,2,1,2, 0,1,2,1],
+    [0,1,2,0, 1,2,0,1],
+    [2,1,0,1, 2,1,0,2],
+  ];
+  /* small lead phrases — [freq, beat offset] in A minor's upper register */
+  const MELODY = [
+    [[523.25,0],[587.33,1],[659.26,2]],
+    [[659.26,0],[587.33,1.5],[523.25,2.5]],
+    [[440.00,0],[523.25,1],[493.88,2],[440.00,3]],
+    [[783.99,0.5],[659.26,2]],
+    [[659.26,0],[698.46,1],[659.26,2],[587.33,3]],
+    [[523.25,0],[659.26,1],[783.99,2],[659.26,3]],
+    [[587.33,0.5],[523.25,1.5],[440.00,2.5]],
+    [[880.00,0],[783.99,2],[659.26,3]],
+  ];
+  const TICKS = [523.25, 587.33, 659.26, 783.99, 880.0];
+  let tickPos = 1;
+  let barIdx = (Math.random()*48)|0;     // the song begins wherever it was already playing
+  let nextBarT = 0;
+  let lastTickFq = 440;
+  let noiseBuf = null;
+
+  function impulse(sec, decay){
+    const rate = ctx.sampleRate, len = rate*sec;
+    const buf = ctx.createBuffer(2, len, rate);
+    for(let ch=0; ch<2; ch++){
+      const d = buf.getChannelData(ch);
+      for(let i=0;i<len;i++) d[i] = (Math.random()*2-1)*Math.pow(1-i/len, decay);
+    }
+    return buf;
+  }
+
+  function init(){
+    if (ctx) return;
+    ctx = new (window.AudioContext||window.webkitAudioContext)();
+    comp = ctx.createDynamicsCompressor();
+    comp.threshold.value = -20; comp.ratio.value = 4;
+    comp.connect(ctx.destination);
+    master = ctx.createGain(); master.gain.value = 0.72; master.connect(comp);
+
+    rev = ctx.createConvolver(); rev.buffer = impulse(6.4, 1.9);
+    const revG = ctx.createGain(); revG.gain.value = 0.85;
+    rev.connect(revG); revG.connect(master);
+
+    dlyIn = ctx.createGain(); dlyIn.gain.value = 1;
+    const dly = ctx.createDelay(2); dly.delayTime.value = 0.46;
+    const fb = ctx.createGain(); fb.gain.value = 0.36;
+    const dlyTone = ctx.createBiquadFilter(); dlyTone.type='lowpass'; dlyTone.frequency.value=1500;
+    const dlyOut = ctx.createGain(); dlyOut.gain.value = 0.36;
+    dlyIn.connect(dly); dly.connect(dlyTone); dlyTone.connect(fb); fb.connect(dly);
+    dlyTone.connect(dlyOut); dlyOut.connect(rev); dlyOut.connect(master);
+
+    /* air — a quiet bed of breath under everything, so silence is never sterile */
+    const al = ctx.sampleRate*3;
+    const airBuf = ctx.createBuffer(1, al, ctx.sampleRate);
+    const ad = airBuf.getChannelData(0);
+    for (let i=0;i<al;i++) ad[i] = Math.random()*2-1;
+    const air = ctx.createBufferSource(); air.buffer = airBuf; air.loop = true;
+    const airF = ctx.createBiquadFilter(); airF.type='lowpass'; airF.frequency.value=440;
+    const airG = ctx.createGain(); airG.gain.value = .015;
+    const airLfo = ctx.createOscillator(); airLfo.frequency.value=.05;
+    const airLfoG = ctx.createGain(); airLfoG.gain.value=.007;
+    airLfo.connect(airLfoG); airLfoG.connect(airG.gain);
+    air.connect(airF); airF.connect(airG); airG.connect(master); airG.connect(rev);
+    air.start(); airLfo.start();
+
+    stringsBus = ctx.createGain(); stringsBus.gain.value = 1;
+    stringsBus.connect(rev); stringsBus.connect(master);
+
+    droneG = ctx.createGain(); droneG.gain.value = 0;
+    const d1 = ctx.createOscillator(); d1.type='sine'; d1.frequency.value=55;
+    const d2 = ctx.createOscillator(); d2.type='sine'; d2.frequency.value=110.4;
+    const dg2 = ctx.createGain(); dg2.gain.value=.35;
+    const lfo = ctx.createOscillator(); lfo.frequency.value=.06;
+    const lfoG = ctx.createGain(); lfoG.gain.value=.3;
+    lfo.connect(lfoG); lfoG.connect(droneG.gain);
+    d1.connect(droneG); d2.connect(dg2); dg2.connect(droneG);
+    droneG.connect(master); d1.start(); d2.start(); lfo.start();
+
+    shimmerG = ctx.createGain(); shimmerG.gain.value = 0;
+    shimmerG.connect(rev);
+
+    /* choir bus — distant voices */
+    choirBus = ctx.createGain(); choirBus.gain.value = 1;
+    choirBus.connect(rev);
+    const choirDry = ctx.createGain(); choirDry.gain.value = .3;
+    choirBus.connect(choirDry); choirDry.connect(master);
+
+    /* cello bus — the low ground */
+    celloBus = ctx.createGain(); celloBus.gain.value = 1;
+    celloBus.connect(master);
+    const celloWet = ctx.createGain(); celloWet.gain.value = .5;
+    celloBus.connect(celloWet); celloWet.connect(rev);
+
+    /* crackle — old record dust, always faintly burning */
+    crackleG = ctx.createGain(); crackleG.gain.value = MIX.crackle/10 * .2;
+    crackleG.connect(master);
+    crackleLoop();
+
+    fragileG = ctx.createGain(); fragileG.gain.value = 0;
+    const fo = ctx.createOscillator(); fo.type='sine'; fo.frequency.value=659.26;
+    const vib = ctx.createOscillator(); vib.frequency.value=4.1;
+    const vibG = ctx.createGain(); vibG.gain.value=2.6;
+    vib.connect(vibG); vibG.connect(fo.frequency);
+    fo.connect(fragileG); fragileG.connect(rev);
+    fo.start(); vib.start();
+
+    /* short noise for hammer transients */
+    const nl = ctx.sampleRate*0.1;
+    noiseBuf = ctx.createBuffer(1, nl, ctx.sampleRate);
+    const nd = noiseBuf.getChannelData(0);
+    for (let i=0;i<nl;i++) nd[i] = Math.random()*2-1;
+
+    nextBarT = ctx.currentTime + 0.3;
+    setInterval(schedule, 140);
+    shimmerLoop();
+  }
+
+  function hT(t, amt){ return t + (Math.random()-.5)*amt; }
+  function hV(v){ return v * (0.78 + Math.random()*0.44); }
+
+  /* ── felt piano — harmonic stack, hammer breath, two-stage decay ── */
+  function piano(fq, t, vel){
+    t = hT(t, 0.05); vel = hV(vel);
+    const out = ctx.createGain(); out.gain.value = 1;
+    const f = ctx.createBiquadFilter(); f.type='lowpass';
+    f.frequency.value = 900 + vel*9000 + Math.random()*300; f.Q.value=.2;
+    f.connect(out);
+
+    [[1,1],[2,.32],[3,.11],[4.01,.04]].forEach(([m,gv])=>{
+      const o = ctx.createOscillator(); o.type='sine';
+      o.frequency.value = fq*m * (1 + (m>1 ? (Math.random()-.5)*0.0015 : 0));
+      o.detune.value = (Math.random()-.5)*4;
+      const g = ctx.createGain();
+      const atk = 0.006 + Math.random()*0.012;
+      g.gain.setValueAtTime(.0001, t);
+      g.gain.exponentialRampToValueAtTime(vel*gv, t+atk);
+      g.gain.exponentialRampToValueAtTime(vel*gv*.28, t+.45);
+      g.gain.exponentialRampToValueAtTime(.0001, t+2.6+Math.random()*.6);
+      o.connect(g); g.connect(f);
+      o.start(t); o.stop(t+3.4);
+    });
+
+    /* the hammer — a breath of felt */
+    const ns = ctx.createBufferSource(); ns.buffer = noiseBuf;
+    const nf2 = ctx.createBiquadFilter(); nf2.type='bandpass';
+    nf2.frequency.value = fq*3.5; nf2.Q.value = 1.2;
+    const ng = ctx.createGain();
+    ng.gain.setValueAtTime(vel*.5, t);
+    ng.gain.exponentialRampToValueAtTime(.0001, t+.045);
+    ns.connect(nf2); nf2.connect(ng); ng.connect(out);
+    ns.start(t); ns.stop(t+.1);
+
+    const dryG = ctx.createGain(); dryG.gain.value = .62;
+    out.connect(dryG); dryG.connect(master);
+    const wet = ctx.createGain(); wet.gain.value = 1.25; out.connect(wet); wet.connect(rev);
+    const ech = ctx.createGain(); ech.gain.value = .85; out.connect(ech); ech.connect(dlyIn);
+  }
+  function bass(fq, t, dur, vel){
+    const o = ctx.createOscillator(); o.type='sine'; o.frequency.value=fq;
+    const g = ctx.createGain();
+    g.gain.setValueAtTime(.0001,t);
+    g.gain.linearRampToValueAtTime(hV(vel), t+.3);
+    g.gain.exponentialRampToValueAtTime(.0001, t+dur);
+    o.connect(g); g.connect(master);
+    o.start(t); o.stop(t+dur+.1);
+  }
+  function strings(notes, t, dur, vel){
+    const f = ctx.createBiquadFilter(); f.type='lowpass';
+    f.frequency.setValueAtTime(420,t);
+    f.frequency.linearRampToValueAtTime(880, t+dur*.55);
+    f.frequency.linearRampToValueAtTime(420, t+dur);
+    const g = ctx.createGain();
+    g.gain.setValueAtTime(.0001,t);
+    g.gain.linearRampToValueAtTime(hV(vel), t+dur*.45);
+    g.gain.linearRampToValueAtTime(.0001, t+dur);
+    f.connect(g); g.connect(stringsBus);
+    notes.forEach(fq=>{
+      [-3.2, 2.6].forEach(det=>{
+        const o = ctx.createOscillator(); o.type='sawtooth';
+        o.frequency.value = fq; o.detune.value = det + (Math.random()-.5)*2;
+        const og = ctx.createGain(); og.gain.value=.05;
+        o.connect(og); og.connect(f);
+        o.start(t); o.stop(t+dur+.1);
+      });
+    });
+  }
+  /* ── choir — two distant voices on the chord's upper tones ── */
+  function choir(tops, t, dur, vel){
+    if (MIX.choir<=0 || vel<=0) return;
+    const v = vel * MIX.choir/10;
+    tops.slice(0,2).forEach((fq,i)=>{
+      const o = ctx.createOscillator(); o.type='sine'; o.frequency.value=fq/2;
+      const o2 = ctx.createOscillator(); o2.type='triangle'; o2.frequency.value=fq/2;
+      o2.detune.value = 6;
+      const vib = ctx.createOscillator(); vib.frequency.value=4.6+Math.random();
+      const vibG = ctx.createGain(); vibG.gain.value = 1.6;
+      vib.connect(vibG); vibG.connect(o.frequency); vibG.connect(o2.frequency);
+      const bp = ctx.createBiquadFilter(); bp.type='bandpass';
+      bp.frequency.value = 760 + i*180; bp.Q.value = .9;
+      const g2 = ctx.createGain(); g2.gain.value = .4;
+      const g = ctx.createGain();
+      g.gain.setValueAtTime(.0001,t);
+      g.gain.linearRampToValueAtTime(v*(i?0.6:1), t+dur*.5);
+      g.gain.linearRampToValueAtTime(.0001, t+dur);
+      o.connect(bp); o2.connect(g2); g2.connect(bp); bp.connect(g); g.connect(choirBus);
+      o.start(t); o2.start(t); vib.start(t);
+      o.stop(t+dur+.1); o2.stop(t+dur+.1); vib.stop(t+dur+.1);
+    });
+  }
+
+  /* ── cello — a bowed low root holding the floor ── */
+  function cello(fq, t, dur, vel){
+    if (MIX.cello<=0 || vel<=0) return;
+    const v = vel * MIX.cello/10;
+    const f = ctx.createBiquadFilter(); f.type='lowpass';
+    f.frequency.setValueAtTime(220,t);
+    f.frequency.linearRampToValueAtTime(360, t+dur*.5);
+    f.frequency.linearRampToValueAtTime(200, t+dur);
+    const g = ctx.createGain();
+    g.gain.setValueAtTime(.0001,t);
+    g.gain.linearRampToValueAtTime(v, t+1.1);
+    g.gain.linearRampToValueAtTime(.0001, t+dur);
+    f.connect(g); g.connect(celloBus);
+    [0,-5,4].forEach(det=>{
+      const o = ctx.createOscillator(); o.type='sawtooth';
+      o.frequency.value = fq; o.detune.value = det;
+      const og = ctx.createGain(); og.gain.value=.06;
+      o.connect(og); og.connect(f);
+      o.start(t); o.stop(t+dur+.1);
+    });
+  }
+
+  /* ── harp — a quick ascent at the turn of a section ── */
+  function harpRun(notes, t, beat, vel){
+    const run = [notes[0], notes[1], notes[2], notes[1]*2, notes[2]*2];
+    run.forEach((fq,k)=>{
+      const tt = t + k*beat*0.12;
+      const o = ctx.createOscillator(); o.type='triangle'; o.frequency.value=fq;
+      const g = ctx.createGain();
+      g.gain.setValueAtTime(.0001,tt);
+      g.gain.exponentialRampToValueAtTime(hV(vel), tt+.008);
+      g.gain.exponentialRampToValueAtTime(.0001, tt+1.1);
+      o.connect(g); g.connect(rev); g.connect(master);
+      const ech = ctx.createGain(); ech.gain.value=.5;
+      g.connect(ech); ech.connect(dlyIn);
+      o.start(tt); o.stop(tt+1.2);
+    });
+  }
+
+  /* ── crackle — sparse dust pops, like the field is playing off vinyl ── */
+  function crackleLoop(){
+    if (ctx && MIX.crackle>0 && noiseBuf){
+      const t = ctx.currentTime + Math.random()*.3;
+      const o = ctx.createBufferSource(); o.buffer = noiseBuf;
+      const hp = ctx.createBiquadFilter(); hp.type='highpass';
+      hp.frequency.value = 1800 + Math.random()*2600;
+      const g = ctx.createGain();
+      const v = .03 + Math.random()*.1;
+      g.gain.setValueAtTime(v, t);
+      g.gain.exponentialRampToValueAtTime(.0001, t+.012+Math.random()*.02);
+      o.connect(hp); hp.connect(g); g.connect(crackleG);
+      o.start(t); o.stop(t+.05);
+    }
+    setTimeout(crackleLoop, 60 + Math.random()*420);
+  }
+
+  function bell(fq, t, vel, dur, wetness){
+    wetness = wetness ?? 1;
+    [1, 2.76].forEach((m,i)=>{
+      const o = ctx.createOscillator(); o.type='sine'; o.frequency.value=fq*m;
+      o.detune.value = (Math.random()-.5)*4;
+      const g = ctx.createGain();
+      g.gain.setValueAtTime(.0001,t);
+      g.gain.exponentialRampToValueAtTime(i? vel*.3 : vel, t+.02);
+      g.gain.exponentialRampToValueAtTime(.0001, t+dur);
+      o.connect(g);
+      const dry = ctx.createGain(); dry.gain.value = .5;
+      g.connect(dry); dry.connect(master);
+      const wet = ctx.createGain(); wet.gain.value = wetness;
+      g.connect(wet); wet.connect(rev);
+      const ech = ctx.createGain(); ech.gain.value = .6*wetness;
+      g.connect(ech); ech.connect(dlyIn);
+      o.start(t); o.stop(t+dur+.1);
+    });
+  }
+
+  function schedule(){
+    if (!ctx) return;
+    const beat = 1/speedMult;
+    while (nextBarT < ctx.currentTime + 2.6){
+      scheduleBar(barIdx, nextBarT, beat);
+      nextBarT += 4*beat;
+      barIdx++;
+    }
+  }
+  function scheduleBar(i, t0, beat){
+    const fr = frac();
+    if (!started || remaining <= 0) return;
+
+    /* eight-bar sections; each section turns the road a little */
+    const sec = (i/8)|0;
+    const prog = PROGS[sec % PROGS.length];
+    const ch = CH[prog[i % 4]];
+    const arp = ARPS[(sec + ((i>>2)&1)) % ARPS.length];
+
+    if (fr > 0.08){
+      bass(ch.bass, t0, 4*beat, .16*Math.min(1,fr*2.2));
+      if (fr > 0.5 && Math.random()<.35) bass(ch.bass*1.5, t0 + 2*beat, 2*beat, .09);
+    }
+    if (fr > 0.25) cello(ch.bass*2, t0, 4*beat, .12*Math.min(1,(fr-.25)*2.2));
+    if (fr > 0.4)  strings(ch.notes, t0, 4*beat, .55*((fr-.4)/.6));
+    if (fr > 0.5)  choir(ch.top, t0, 4*beat, .06*((fr-.5)/.5));
+    if (fr > 0.55 && i%8===0) harpRun(ch.notes, t0, beat, .05);
+
+    if (fr > 0.62){
+      arp.forEach((n,k)=>{
+        if (Math.random()<.06) return;
+        const oct = (k===4||k===7) ? 2 : 1;
+        piano(ch.notes[n]*oct, t0 + k*beat/2, .1 + (k===0?.04:0));
+      });
+      /* the lead — small phrases on alternating bars, never the same twice */
+      if (i%2===1 && fr>0.5){
+        const mel = MELODY[(sec + i) % MELODY.length];
+        mel.forEach(([fq,b])=>{ if (Math.random()<.85) piano(fq, t0 + b*beat, .055); });
+      }
+      if (Math.random()<.3) piano(ch.top[(Math.random()*3)|0], t0 + (2+((Math.random()*2)|0))*beat, .055);
+      if (Math.random()<.15) piano(ch.notes[1]*2, t0 + 3.75*beat, .05);
+    } else if (fr > 0.34){
+      [0,1,2,1].forEach((n,k)=>{ if (Math.random()<.9) piano(ch.notes[n], t0 + k*beat, .085); });
+      if (i%4===3 && Math.random()<.5){
+        const mel = MELODY[sec % MELODY.length];
+        piano(mel[0][0], t0 + 2*beat, .045);
+      }
+    } else if (fr > 0.13){
+      if (Math.random()<.75) piano(ch.notes[0], t0, .075);
+      if (Math.random()<.4)  piano(ch.notes[2], t0 + 2*beat, .055);
+    }
+  }
+
+  function shimmerLoop(){
+    if (ctx){
+      const t = ctx.currentTime + 1 + Math.random()*5;
+      const o = ctx.createOscillator(); o.type='sine';
+      o.frequency.value = [1046.5, 1318.5, 1568, 1975.5][(Math.random()*4)|0];
+      const g = ctx.createGain(); g.gain.setValueAtTime(0,t);
+      g.gain.linearRampToValueAtTime(.04, t+.5);
+      g.gain.exponentialRampToValueAtTime(.0001, t+3.4);
+      o.connect(g); g.connect(shimmerG);
+      o.start(t); o.stop(t+3.6);
+    }
+    setTimeout(shimmerLoop, (2+Math.random()*6)*1000);
+  }
+
+  /* the second's tick — a small distant clank, half metronome half music box.
+     volume lives on the panel ("tick") */
+  function tickNote(){
+    if(!ctx) return;
+    const t = ctx.currentTime + Math.random()*.03;
+    tickPos += (Math.random()<.6 ? 1 : -1);
+    tickPos = Math.max(0, Math.min(TICKS.length-1, tickPos));
+    lastTickFq = TICKS[tickPos];
+    const vel = hV(.05) * MIX.tick/10;
+    if (vel <= 0) return;
+    /* woody clank body */
+    const o = ctx.createOscillator(); o.type='triangle';
+    o.frequency.value = TICKS[tickPos]*2;            // an octave higher — smaller, farther
+    o.detune.value = (Math.random()-.5)*8;
+    const bp = ctx.createBiquadFilter(); bp.type='bandpass';
+    bp.frequency.value = TICKS[tickPos]*2.4; bp.Q.value = 2.2;
+    const g = ctx.createGain();
+    g.gain.setValueAtTime(.0001,t);
+    g.gain.exponentialRampToValueAtTime(vel, t+.004);
+    g.gain.exponentialRampToValueAtTime(.0001, t+.12);   // short. a knock, not a note
+    /* the strike — a click of air at the front */
+    const ns = ctx.createBufferSource(); ns.buffer = noiseBuf;
+    const nf2 = ctx.createBiquadFilter(); nf2.type='highpass'; nf2.frequency.value=3200;
+    const ng = ctx.createGain();
+    ng.gain.setValueAtTime(vel*.8, t);
+    ng.gain.exponentialRampToValueAtTime(.0001, t+.018);
+    ns.connect(nf2); nf2.connect(ng);
+    o.connect(bp); bp.connect(g);
+    /* mostly room, little body — it ticks from somewhere across the dark */
+    const dry = ctx.createGain(); dry.gain.value = .22;
+    const wet = ctx.createGain(); wet.gain.value = 1.3;
+    const ech = ctx.createGain(); ech.gain.value = .9;
+    [g, ng].forEach(src=>{ src.connect(dry); src.connect(wet); src.connect(ech); });
+    dry.connect(master); wet.connect(rev); ech.connect(dlyIn);
+    o.start(t); o.stop(t+.2); ns.start(t); ns.stop(t+.05);
+  }
+
+  function minuteBell(){ if(ctx) bell(220, ctx.currentTime, .12, 3.4, 1.1); }
+
+  function hourSwell(){
+    if(!ctx) return;
+    const t = ctx.currentTime;
+    const o = ctx.createOscillator(); o.type='sine';
+    o.frequency.setValueAtTime(41.2,t);
+    o.frequency.linearRampToValueAtTime(55, t+2.5);
+    const g = ctx.createGain();
+    g.gain.setValueAtTime(.0001,t);
+    g.gain.linearRampToValueAtTime(.42, t+1.4);
+    g.gain.exponentialRampToValueAtTime(.0001, t+4.8);
+    o.connect(g); g.connect(master);
+    o.start(t); o.stop(t+5);
+    master.gain.cancelScheduledValues(t);
+    master.gain.setValueAtTime(master.gain.value, t);
+    master.gain.linearRampToValueAtTime(.3, t+.8);
+    master.gain.linearRampToValueAtTime(.72, t+3.6);
+  }
+
+  function birthChime(tier){
+    if(!ctx) return;
+    bell([1318.5, 659.26, 329.63][tier], ctx.currentTime, .06, 2.6, 1.4);
+  }
+
+  function taken(){
+    if(!ctx) return;
+    const t = ctx.currentTime;
+    const o = ctx.createOscillator(); o.type='sine'; o.frequency.value=82;
+    const g = ctx.createGain();
+    g.gain.setValueAtTime(.0001,t);
+    g.gain.exponentialRampToValueAtTime(.09, t+.01);
+    g.gain.exponentialRampToValueAtTime(.0001, t+.2);
+    o.connect(g); g.connect(master);
+    o.start(t); o.stop(t+.25);
+  }
+
+  /* the last light — one beat of silence, then the same note the final second sang,
+     an octave shadow beneath it, drowned in echo until it isn't there */
+  function farewell(){
+    if(!ctx) return;
+    const t = ctx.currentTime + 1.0;
+    bell(lastTickFq,   t,      .08,  12, 2.6);
+    bell(lastTickFq/2, t+0.03, .032, 13, 2.8);
+  }
+
+  function setArc(fr, total){
+    if(!ctx) return;
+    const t = ctx.currentTime;
+    const smooth=(lo,hi)=>Math.max(0,Math.min(1,(fr-lo)/(hi-lo)));
+    shimmerG.gain.setTargetAtTime(.9*smooth(.5,.85), t, 1.6);
+    droneG.gain.setTargetAtTime(total>0 ? .05 + .1*(1-smooth(.1,.5)) : 0, t, 1.8);
+    const fragile = total>0 && total<=75 ? .04*(1-total/75)+.012 : 0;
+    fragileG.gain.setTargetAtTime(fragile, t, 1.6);
+    crackleG.gain.setTargetAtTime(MIX.crackle/10 * .2 * (total>0 ? 1 : .4), t, .8);
+  }
+
+  return { init, tickNote, minuteBell, hourSwell, birthChime, taken, farewell, setArc,
+           ready:()=>!!ctx };
+})();
+
+/* ═══════════════ movement ═══════════════ */
+const MAXV  = [0.30, 0.20, 0.125];
+const STEER = [2.0, 1.4, 0.9];
+
+const FOLLOW_RADIUS = 320;   // beyond this, they lose you and resume their lives
+
+/* hours move like the snitch — calm hover, then a graceful dart somewhere new */
+function driftHour(f, dt, t){
+  if (f.hx0===undefined){ f.hx0=f.x; f.hy0=f.y; f.dartT=t+5+Math.random()*9; f.dartK=0; }
+  /* a faint lean toward the giver */
+  if (mouse.on){
+    const dx=mouse.x-f.x, dy=mouse.y-f.y, d=Math.hypot(dx,dy);
+    if (d<FOLLOW_RADIUS && d>1){
+      f.vx += dx/d*0.0028*dt*60; f.vy += dy/d*0.0028*dt*60;
+    }
+  }
+  if (t > f.dartT){
+    f.dartT = t + 7 + Math.random()*10;
+    f.hx0 = W*(0.08+Math.random()*0.84);
+    f.hy0 = H*(0.08+Math.random()*0.76);
+    f.dartK = 1;                              // the impulse — eased away below
+  }
+  f.dartK = Math.max(0, f.dartK - dt*0.5);
+  const k = f.dartK*f.dartK;                  // soft launch, soft landing
+  const hx = f.hx0 + Math.sin(t*0.5+f.ph)*14 + Math.sin(t*0.21+f.ph2)*9;
+  const hy = f.hy0 + Math.cos(t*0.43+f.ph2)*10 + Math.sin(t*0.17+f.ph)*7;
+  const steer = 0.0016*(0.9 + k*6);
+  f.vx += (hx-f.x)*steer*dt*60;
+  f.vy += (hy-f.y)*steer*dt*60;
+  f.vx *= 0.955; f.vy *= 0.955;
+  const maxV = 0.10 + k*0.45;
+  const sp = Math.hypot(f.vx, f.vy);
+  if (sp > maxV){ f.vx=f.vx/sp*maxV; f.vy=f.vy/sp*maxV; }
+  f.x += f.vx*dt*60; f.y += f.vy*dt*60;
+  f.rot += f.rotV*dt;
+}
+
+function drift(f, dt, t){
+  if (f.state==='dying' && f.target) return;
+  if (f.tier===2){ driftHour(f, dt, t); return; }
+
+  let chasing = false;
+  if (f.follower && mouse.on && f.state==='alive'){
+    const d = Math.hypot(mouse.x-f.x, mouse.y-f.y);
+    if (d < FOLLOW_RADIUS){
+      /* gravity — they chase the moving light, dragging behind, orbiting close */
+      chasing = true;
+      const oa = f.ph + t*f.followW*2.2;
+      f.tx = mouse.x + Math.cos(oa)*f.followR;
+      f.ty = mouse.y + Math.sin(oa)*f.followR*0.8;
+    }
+  }
+  if (!chasing && t > f.roamT){
+    f.roamT = t + 5 + Math.random()*11;
+    if (f.far){
+      f.tx = W*(-0.07 + Math.random()*1.14);
+      f.ty = H*(-0.07 + Math.random()*1.1);
+    } else {
+      f.tx = W*(0.02 + Math.random()*0.96);
+      f.ty = H*(0.02 + Math.random()*0.9);
+    }
+  }
+
+  const fl = chasing ? 6.5 : 1;
+  let ax = (f.tx-f.x)*0.0016*STEER[f.tier]*fl;
+  let ay = (f.ty-f.y)*0.0016*STEER[f.tier]*fl;
+  /* minutes feel the giver pass — a lean, not a chase */
+  if (f.tier===1 && mouse.on){
+    const dx=mouse.x-f.x, dy=mouse.y-f.y, d=Math.hypot(dx,dy);
+    if (d<FOLLOW_RADIUS && d>1){ ax += dx/d*0.0024; ay += dy/d*0.0024; }
+  }
+  ax += (Math.sin(t*f.tw*0.9+f.ph)*5 + Math.sin(t*0.31+f.ph2)*7) * 0.0038;
+  ay += (Math.cos(t*f.tw*0.7+f.ph2)*4 + Math.sin(t*0.23+f.ph)*6) * 0.0034;
+  f.vx += ax*dt*60; f.vy += ay*dt*60;
+  f.vx *= 0.962; f.vy *= 0.962;
+  const maxV = MAXV[f.tier] * (chasing ? 4.2 : 1);
+  const sp = Math.hypot(f.vx, f.vy);
+  if (sp > maxV){ f.vx = f.vx/sp*maxV; f.vy = f.vy/sp*maxV; }
+  f.x += f.vx*dt*60; f.y += f.vy*dt*60;
+  f.rot += f.rotV*dt;
+}
+
+const par = {x:0, y:0};
+function updateParallax(){
+  const tx = mouse.on ? (mouse.x - W/2) : 0;
+  const ty = mouse.on ? (mouse.y - H/2) : 0;
+  par.x += (tx - par.x)*0.03;
+  par.y += (ty - par.y)*0.03;
+}
+const PARK = [0.006, 0.014, 0.026];
+
+/* ═══════════════ drawing ═══════════════ */
+function easeOut(k){ return 1-Math.pow(1-k,3); }
+
+/* one ray of an energy burst: a soft wide underglow, a bright tapering core
+   (wider at root, thin at tip), broken fragments beyond — and each ray lives
+   on its own clock, sputtering like a lit cracker stick */
+function burstRay(x, y, r, L, color, glowColor, alpha, t, baseW, lod=true){
+  const ang = r.ang;
+  const ca = Math.cos(ang), sa = Math.sin(ang);
+  /* per-ray life: fast irregular sputter, slow drift underneath */
+  const flick = 0.62 + 0.28*Math.sin(t*r.fl + r.ph) + 0.16*Math.sin(t*r.fl*2.63 + r.ph2);
+  const len = L * r.len * (0.93 + 0.07*Math.sin(t*1.6 + r.ph))
+                        * (0.96 + 0.05*Math.sin(t*r.fl*1.7 + r.ph2));
+  const a = alpha * flick;
+
+  cx.strokeStyle = glowColor; cx.lineCap='round';
+  cx.globalAlpha = a*.3;
+  cx.lineWidth = baseW*r.w*2.6;
+  cx.beginPath(); cx.moveTo(x, y); cx.lineTo(x+ca*len*.8, y+sa*len*.8); cx.stroke();
+
+  cx.strokeStyle = color;
+  cx.globalAlpha = a*.85;
+  cx.lineWidth = baseW*r.w;
+  cx.beginPath(); cx.moveTo(x, y); cx.lineTo(x+ca*len*.62, y+sa*len*.62); cx.stroke();
+  cx.globalAlpha = a*.55;
+  cx.lineWidth = baseW*r.w*.45;
+  cx.beginPath(); cx.moveTo(x+ca*len*.5, y+sa*len*.5); cx.lineTo(x+ca*len, y+sa*len); cx.stroke();
+
+  const px = -sa, py = ca;
+  if (lod) for (const s2 of r.segs){
+    const d0 = s2.a*len, d1 = (s2.a+s2.b)*len;
+    cx.globalAlpha = a*.4;
+    cx.lineWidth = baseW*s2.w*.6;
+    cx.beginPath();
+    cx.moveTo(x+ca*d0+px*s2.off, y+sa*d0+py*s2.off);
+    cx.lineTo(x+ca*d1+px*s2.off*.5, y+sa*d1+py*s2.off*.5);
+    cx.stroke();
+  }
+
+  /* a spark spits off the tip now and then */
+  if (lod && Math.random() < .1*flick){
+    const sd = len*(1.02+Math.random()*.18);
+    cx.globalAlpha = a*.7;
+    cx.fillStyle = color;
+    cx.fillRect(x+ca*sd-(.6), y+sa*sd-(.6), 1.2, 1.2);
+  }
+}
+
+function drawSecond(f, t, fr, ox, oy){
+  const age = t - f.birth;
+  if (f.born < 1) f.born = Math.min(1, age/0.5);
+  let x=f.x+ox, y=f.y+oy, alpha=f.born;
+
+  if (f.state==='dying'){
+    const k = Math.min(1, (t-f.stT)/0.85);
+    if (f.target){ x = f.x+(f.target.x-f.x)*easeOut(k)+ox*(1-k); y = f.y+(f.target.y-f.y)*easeOut(k)+oy*(1-k); }
+    alpha *= 1-k;
+    if (k>0.85 && Math.random()<.45) alpha = 0;
+    if (k>=1){ killSec(f, x, y); return; }
+  }
+
+  const sat = 14 + fr*48;
+  const hue = (f.hue*fr + 222*(1-fr));
+  const twk = 0.55 + 0.45*Math.sin(t*f.tw*2.2 + f.ph);
+
+  /* one draw: glow and core live in the same baked sprite */
+  const gl = (5 + f.depth*6);
+  cx.globalAlpha = alpha * (0.42+0.52*twk) * (0.55+f.depth*.45);
+  cx.drawImage(secSprite(hue, sat), x-gl, y-gl, gl*2, gl*2);
+}
+
+function drawMinute(f, t, fr, ox, oy){
+  const age = t - f.birth;
+  if (f.born < 1) f.born = Math.min(1, age/0.5);
+  let x=f.x+ox, y=f.y+oy, alpha=f.born, split=0;
+
+  if (f.state==='glitch'){
+    const k = Math.min(1, (t-f.stT)/0.46);
+    if (Math.random()<.3) return;
+    x += (Math.random()-.5)*3.5; y += (Math.random()-.5)*3.5;
+    split = 2.4; alpha *= 1-k*.6;
+  }
+
+  const hue = ((f.hue + t*4*f.hueDrift/14)*fr + 226*(1-fr)) % 360;
+  const sat = 26 + fr*52;
+  const twk = 0.6 + 0.4*Math.sin(t*f.tw*1.6 + f.ph);
+  if (t > f.glintT){ f.glint = 1; f.glintT = t + 10 + Math.random()*24; }
+  f.glint = Math.max(0, f.glint - 0.025);
+  const ig = f.glint;
+
+  const core = 1.2 + f.depth*0.9;
+  const glowR = (10 + f.depth*8) * (1+ig*.4);
+  const rayL  = (6.5 + f.depth*5) * (0.9 + 0.1*twk + ig*.5);
+  /* detail share shrinks as the minute crowd grows */
+  let det;
+  if (quality===0) det = (f.id%4)===0;
+  else if (quality===1 || minF.length>80) det = (f.id%2)===0;
+  else det = true;
+
+  if (split>0){
+    cx.globalAlpha = alpha*.4;
+    cx.drawImage(glowSprite(0,80),   x-glowR-split, y-glowR, glowR*2, glowR*2);
+    cx.drawImage(glowSprite(215,80), x-glowR+split, y-glowR, glowR*2, glowR*2);
+  }
+
+  cx.globalAlpha = alpha*(0.45+0.35*twk)*(0.6+f.depth*.4);
+  cx.drawImage(glowSprite(hue, sat, true), x-glowR, y-glowR, glowR*2, glowR*2);
+  if (det && quality===2){
+    cx.globalAlpha = alpha*0.22;
+    const wob = 2.2;
+    cx.drawImage(glowSprite((hue+45)%360, sat, true),
+      x-glowR*.8+Math.sin(t*.7+f.ph)*wob, y-glowR*.8+Math.cos(t*.6+f.ph2)*wob, glowR*1.6, glowR*1.6);
+  }
+
+  /* the burst — rays around the whole circle, from the exact centre */
+  const aBase = alpha*(.4+.4*twk+ig*.4);
+  const nR = det ? f.rays.length : 4;
+  for (let ri=0; ri<nR; ri++){
+    const r = f.rays[ri];
+    const rh = (hue + r.hueOff*fr + 360) % 360;
+    burstRay(x, y, r, rayL,
+      `hsla(${rh},${sat+12}%,88%,1)`, `hsla(${rh},${sat}%,70%,1)`,
+      aBase, t, 0.9, det);
+  }
+
+  if (det) for (const fl of f.flecks){
+    const fa = fl.a + f.rot*.4;
+    const fd = rayL*fl.d * (0.85+0.15*Math.sin(t+fl.ph));
+    const fx2 = x+Math.cos(fa)*fd, fy2 = y+Math.sin(fa)*fd;
+    cx.globalAlpha = alpha*(.14+.22*Math.max(0,Math.sin(t*f.tw+fl.ph)));
+    cx.strokeStyle = `hsla(${hue},${sat+12}%,88%,1)`; cx.lineWidth = fl.w;
+    cx.beginPath();
+    cx.moveTo(fx2, fy2);
+    cx.lineTo(fx2+Math.cos(fa)*fl.l, fy2+Math.sin(fa)*fl.l);
+    cx.stroke();
+  }
+
+  /* bright heart */
+  cx.globalAlpha = alpha*.8;
+  cx.drawImage(glowSprite(hue, 20), x-core*3, y-core*3, core*6, core*6);
+  cx.globalAlpha = alpha;
+  cx.fillStyle = `hsla(${hue},30%,97%,1)`;
+  cx.beginPath(); cx.arc(x,y,core,0,7); cx.fill();
+}
+
+function drawHour(f, t, fr, ox, oy){
+  const age = t - f.birth;
+  if (f.born < 1) f.born = Math.min(1, age/0.6);
+  let x=f.x+ox, y=f.y+oy, alpha=f.born, split=0, scale=1, glowMul=1;
+
+  const st = t - f.stT;
+  if (f.state==='surge'){
+    const k = Math.min(1, st/1.5);
+    glowMul = 1+k*3.4; scale = 1+k*1.1; split = k*2;
+    if (k>0.25) lightNeighbours(f, k, ox, oy);
+  }
+  if (f.state==='collapse'){
+    const k = Math.min(1, st/0.95);
+    glowMul = (1-k)*4.4+.1; scale = Math.max(0.05,1-k);
+    alpha *= 1-k*.65;
+  }
+  if (f.dread){
+    if (Math.random()<.07) return;
+    if (Math.random()<.18){ x+=(Math.random()-.5)*2.4; y+=(Math.random()-.5)*2.4; split=1.8; }
+  }
+
+  const hue = ((f.hue + t*6)*fr + 228*(1-fr)) % 360;
+  const sat = 32 + fr*50;
+  const twk = 0.65 + 0.35*Math.sin(t*f.tw*1.3 + f.ph);
+  if (t > f.glintT){ f.glint = 1; f.glintT = t + 12 + Math.random()*26; }
+  f.glint = Math.max(0, f.glint - 0.02);
+  const ig = f.glint;
+
+  const core = (3.2 + f.depth*2.0)*scale;
+  const glowR = (34 + f.depth*20)*glowMul;
+  const baseL = (26 + f.depth*15)*scale*(0.92 + 0.08*twk + ig*.45);
+
+  if (split>0){
+    cx.globalAlpha = alpha*.4;
+    cx.drawImage(glowSprite(0,80),   x-glowR-split, y-glowR, glowR*2, glowR*2);
+    cx.drawImage(glowSprite(215,80), x-glowR+split, y-glowR, glowR*2, glowR*2);
+  }
+
+  cx.globalAlpha = alpha*(0.4+0.35*twk);
+  cx.drawImage(glowSprite(hue, sat, true), x-glowR, y-glowR, glowR*2, glowR*2);
+  cx.globalAlpha = alpha*0.26;
+  cx.drawImage(glowSprite((hue+40)%360, sat, true),
+    x-glowR*.68+Math.sin(t*.5+f.ph)*3, y-glowR*.68+Math.cos(t*.43+f.ph2)*3, glowR*1.36, glowR*1.36);
+
+  if (intakeAmt>0 && f.state==='alive' && Math.random() < intakeAmt*0.027){
+    intake.push({
+      hx:f, a:Math.random()*Math.PI*2,
+      d: glowR*1.6 + Math.random()*glowR*1.4,
+      t0:t, life: 0.42+Math.random()*0.45,
+      hue:(hue+Math.random()*80)%360,
+    });
+  }
+
+  /* the burst — fourteen uneven rays of cycling colour, all from the heart */
+  const aBase = alpha*(.32+.36*twk+ig*.35);
+  for (let i=0;i<f.rays.length;i++){
+    const r = f.rays[i];
+    const rh = (hue + (r.hueOff + i*16 + t*22)*Math.min(1,fr+.25) + 360) % 360;
+    burstRay(x, y, r, baseL,
+      `hsla(${rh},${sat+18}%,86%,1)`, `hsla(${rh},${sat+4}%,68%,1)`,
+      aBase, t, 1.15);
+  }
+
+  for (const fl of f.flecks){
+    const fa = fl.a + f.rot*.3;
+    const fd = baseL*1.4*fl.d*(0.85+0.15*Math.sin(t+fl.ph));
+    const fx2 = x+Math.cos(fa)*fd, fy2 = y+Math.sin(fa)*fd;
+    cx.globalAlpha = alpha*(.12+.2*Math.max(0,Math.sin(t*f.tw+fl.ph)));
+    cx.strokeStyle = `hsla(${(hue+50)%360},${sat}%,86%,1)`;
+    cx.lineWidth = fl.w;
+    cx.beginPath();
+    cx.moveTo(fx2, fy2);
+    cx.lineTo(fx2+Math.cos(fa)*fl.l, fy2+Math.sin(fa)*fl.l);
+    cx.stroke();
+  }
+
+  /* wings — translucent petals, full shapes, beating like they're carrying her */
+  cx.globalAlpha = 1;
+  f.flap += (f.state==='surge' ? 0.34 : 0.16);
+  const beat = Math.sin(f.flap);
+  const wA = (0.55 + 0.25*Math.abs(beat)) * alpha;
+  const WINGS = [
+    { ox:0.55, oy:-0.35, rot:-0.62, len:5.4, wid:2.1, fl:1.0 },   // upper
+    { ox:0.45, oy: 0.55, rot: 0.78, len:3.4, wid:1.4, fl:0.65 },  // lower
+  ];
+  for (const dir of [-1,1]){
+    for (const wg of WINGS){
+      cx.save();
+      cx.translate(x + dir*core*wg.ox, y + core*wg.oy);
+      cx.rotate(dir*(wg.rot + beat*0.3*wg.fl));
+      cx.scale(dir, 1);
+      const L = core*wg.len, Wd = core*wg.wid;
+      const grd = cx.createLinearGradient(0, 0, L, 0);
+      grd.addColorStop(0,  `hsla(${(hue+30)%360},${sat}%,95%,${0.34*wA})`);
+      grd.addColorStop(.65,`hsla(${(hue+70)%360},${sat}%,88%,${0.15*wA})`);
+      grd.addColorStop(1,  'hsla(0,0%,100%,0)');
+      cx.fillStyle = grd;
+      cx.beginPath();
+      cx.ellipse(L*0.52, -Wd*0.12, L*0.52, Wd*0.5, 0, 0, Math.PI*2);
+      cx.fill();
+      cx.strokeStyle = `hsla(${(hue+30)%360},${sat}%,92%,${0.26*wA})`;
+      cx.lineWidth = 0.7;
+      cx.stroke();
+      /* a vein of light down the middle */
+      cx.strokeStyle = `hsla(${(hue+40)%360},${sat}%,95%,${0.18*wA})`;
+      cx.lineWidth = 0.5;
+      cx.beginPath(); cx.moveTo(L*0.06, 0); cx.lineTo(L*0.92, -Wd*0.1); cx.stroke();
+      cx.restore();
+    }
+  }
+
+  /* satellites */
+  for (let i=0;i<3;i++){
+    const oa = t*0.7+f.ph+i*2.1;
+    const orx = x+Math.cos(oa)*(core*4+i*4);
+    const ory = y+Math.sin(oa)*(core*2.6+i*2.5);
+    cx.globalAlpha = alpha*.5*twk;
+    cx.fillStyle = `hsla(${(hue+i*70)%360},${sat}%,90%,1)`;
+    cx.fillRect(orx-.7, ory-.7, 1.4, 1.4);
+  }
+
+  /* white-hot heart of the burst */
+  cx.globalAlpha = alpha*.9;
+  cx.drawImage(glowSprite(hue, 20), x-core*3.4, y-core*3.4, core*6.8, core*6.8);
+  cx.globalAlpha = alpha;
+  cx.fillStyle = `hsla(${hue},22%,98%,1)`;
+  cx.beginPath(); cx.arc(x,y,core,0,7); cx.fill();
+}
+
+function drawIntake(t, fr, oxH, oyH){
+  cx.lineCap = 'round';
+  for (let i=intake.length-1;i>=0;i--){
+    const p = intake[i];
+    const k = (t-p.t0)/p.life;
+    if (k>=1 || !hrF.includes(p.hx)){ intake.splice(i,1); continue; }
+    /* a reversed explosion: slow at the rim, accelerating into the heart, spiralling */
+    const fall = 1 - k*k;                      // ease-in collapse
+    const spin = p.a + k*k*2.8;                // the spiral tightens as it falls
+    const d  = p.d * fall;
+    const cxp = p.hx.x+oxH, cyp = p.hx.y+oyH;
+    const px = cxp + Math.cos(spin)*d;
+    const py = cyp + Math.sin(spin)*d;
+    /* trail = where it just was; faster fall, longer tail */
+    const k2 = Math.max(0, k-0.07);
+    const d2 = p.d * (1-k2*k2);
+    const spin2 = p.a + k2*k2*2.8;
+    const qx = cxp + Math.cos(spin2)*d2;
+    const qy = cyp + Math.sin(spin2)*d2;
+    const al = Math.sin(Math.min(1,k*1.6)*Math.PI)*0.7*Math.min(1,fr*1.5+.3);
+    cx.globalAlpha = al*.5;
+    cx.strokeStyle = `hsla(${p.hue},70%,80%,1)`;
+    cx.lineWidth = .7;
+    cx.beginPath(); cx.moveTo(qx, qy); cx.lineTo(px, py); cx.stroke();
+    cx.globalAlpha = al;
+    cx.fillStyle = `hsla(${p.hue},70%,90%,1)`;
+    cx.fillRect(px-.8, py-.8, 1.6, 1.6);
+  }
+  cx.globalAlpha = 1;
+}
+
+function lightNeighbours(src, k, ox, oy){
+  for (const f of secF){
+    const d = Math.hypot(f.x-src.x, f.y-src.y);
+    if (d < 280 && d > 1){
+      cx.globalAlpha = (1-d/280)*0.3*k;
+      cx.drawImage(glowSprite(f.hue,60), f.x+ox-12, f.y+oy-12, 24, 24);
+      f.vx += (src.x-f.x)/d*0.04; f.vy += (src.y-f.y)/d*0.04;
+    }
+  }
+  cx.globalAlpha = 1;
+}
+
+/* ── film grain — pre-baked speck tile, shifted each few frames; cheap and visible ── */
+const grainC = document.createElement('canvas');
+grainC.width = 256; grainC.height = 256;
+const gctx = grainC.getContext('2d');
+let grainPat = null, grainTick = 0, grainOx = 0, grainOy = 0;
+(function makeGrainTile(){
+  const img = gctx.createImageData(256,256);
+  for(let i=0;i<img.data.length;i+=4){
+    const r = Math.random();
+    if (r < 0.16){            // a bright speck
+      img.data[i]=img.data[i+1]=img.data[i+2]=235;
+      img.data[i+3]= 14 + (Math.random()*22|0);
+    } else if (r < 0.3){      // a dark speck
+      img.data[i]=img.data[i+1]=img.data[i+2]=0;
+      img.data[i+3]= 12 + (Math.random()*18|0);
+    } else {
+      img.data[i+3]=0;        // clear
+    }
+  }
+  gctx.putImageData(img,0,0);
+  grainPat = cx.createPattern(grainC, 'repeat');
+})();
+let grainAmt = 19;
+function grain(){
+  if (grainAmt<=0 || !grainPat) return;
+  if (++grainTick % 3 === 0){
+    grainOx = (Math.random()*256)|0;
+    grainOy = (Math.random()*256)|0;
+  }
+  cx.save();
+  cx.globalAlpha = Math.min(1, grainAmt/12);
+  cx.translate(-grainOx, -grainOy);
+  cx.fillStyle = grainPat;
+  cx.fillRect(0, 0, W+256, H+256);
+  cx.restore();
+  cx.globalAlpha = 1;
+}
+
+/* ═══════════════ main loop ═══════════════ */
+const whisperEl = document.getElementById('whisper');
+let whisperShown = false;
+let lastFrame = now();
+
+function frame(){
+  const t = now();
+  const dt = Math.min(0.05, t-lastFrame);
+  lastFrame = t;
+
+  advance();
+  updateParallax();
+  cursorGlow(t);
+
+  const fr = frac();
+
+  cx.fillStyle = '#030409';
+  cx.fillRect(0,0,W,H);
+
+  if (fr > 0.02 && remaining > 0){
+    cx.globalCompositeOperation = 'lighter';
+    const blobs = [
+      [W*.25, H*.3, 300, 268],[W*.72, H*.5, 360, 200],[W*.5, H*.78, 320, 318]
+    ];
+    for(const [bx,by,br,bh] of blobs){
+      const g = cx.createRadialGradient(bx,by,0,bx,by,br);
+      g.addColorStop(0, `hsla(${bh},52%,42%,${0.055*fr})`);
+      g.addColorStop(1, 'transparent');
+      cx.fillStyle = g;
+      cx.fillRect(bx-br,by-br,br*2,br*2);
+    }
+    cx.globalCompositeOperation = 'source-over';
+  }
+
+  for (let i=ghosts.length-1;i>=0;i--){
+    const g = ghosts[i], age = t-g.t0, life = 50;
+    if (age>life){ ghosts.splice(i,1); continue; }
+    cx.globalAlpha = 0.10*(1-age/life);
+    cx.fillStyle = '#cdd0e8';
+    cx.fillRect(g.x-.6, g.y-.6, 1.2, 1.2);
+  }
+  cx.globalAlpha = 1;
+
+  for (let i=embers.length-1;i>=0;i--){
+    const e = embers[i], age = t-e.t0, life = 4.5;
+    if (age>life){ embers.splice(i,1); continue; }
+    cx.globalCompositeOperation='lighter';
+    cx.globalAlpha = 0.5*(1-age/life);
+    cx.drawImage(glowSprite(28,70), e.x-11, e.y-11, 22, 22);
+    cx.globalCompositeOperation='source-over';
+  }
+  cx.globalAlpha = 1;
+
+  const o0x = -par.x*PARK[0], o0y = -par.y*PARK[0];
+  const o1x = -par.x*PARK[1], o1y = -par.y*PARK[1];
+  const o2x = -par.x*PARK[2], o2y = -par.y*PARK[2];
+
+  /* one blend pass for the whole population — no mode thrashing */
+  cx.globalCompositeOperation = 'lighter';
+  for (const f of secF){ drift(f, dt, t); }
+  for (let i=secF.length-1;i>=0;i--) drawSecond(secF[i], t, fr, o0x, o0y);
+  for (const f of minF){ drift(f, dt, t); drawMinute(f, t, fr, o1x, o1y); }
+  drawIntake(t, fr, o2x, o2y);
+  for (const f of hrF){ drift(f, dt, t); drawHour(f, t, fr, o2x, o2y); }
+  cx.globalCompositeOperation = 'source-over';
+  cx.globalAlpha = 1;
+
+  watchPerf(dt, t);
+  grain();
+
+  const vg = cx.createRadialGradient(W/2,H/2,Math.min(W,H)*.36, W/2,H/2,Math.max(W,H)*.75);
+  vg.addColorStop(0,'transparent'); vg.addColorStop(1,'rgba(2,3,7,.5)');
+  cx.fillStyle = vg; cx.fillRect(0,0,W,H);
+
+  if (audio.ready()) audio.setArc(fr, remaining);
+
+  const shouldWhisper = started && remaining<=0;
+  if (shouldWhisper !== whisperShown){
+    whisperShown = shouldWhisper;
+    whisperEl.classList.toggle('on', shouldWhisper);
+  }
+
+  if (panelOn){
+    const r = Math.max(0, Math.floor(remaining));
+    const h = (r/3600)|0, m = ((r%3600)/60)|0, s = r%60;
+    document.getElementById('pClock').textContent =
+      h+':'+String(m).padStart(2,'0')+':'+String(s).padStart(2,'0');
+    document.getElementById('pPop').textContent =
+      `visible  s ${secF.length}  m ${minF.length}  h ${hrF.length}`+
+      (r>SEC_CAP ? `\nwaiting in the dark ${r-SEC_CAP}` : '')+
+      `\nghosts ${ghosts.length}  followers ${secF.filter(f=>f.follower).length}`;
+  }
+
+  requestAnimationFrame(frame);
+}
+requestAnimationFrame(frame);
+
+/* ═══════════════ opening — set the time, let them live ═══════════════ */
+const intro = document.getElementById('intro');
+const tH = document.getElementById('tH'), tM = document.getElementById('tM'), tS = document.getElementById('tS');
+const timeInputs = [tH, tM, tS];
+
+/* digits only; hop to the next field after two */
+timeInputs.forEach((inp, idx)=>{
+  inp.addEventListener('input', ()=>{
+    inp.value = inp.value.replace(/\D/g,'').slice(0,2);
+    if (inp.value.length===2 && idx<2) timeInputs[idx+1].focus();
+  });
+  inp.addEventListener('keydown', e=>{ if (e.key==='Enter') begin(); });
+});
+
+function begin(){
+  if (intro.classList.contains('gone')) return;
+  audio.init();
+  const h = parseInt(tH.value||'0',10)||0;
+  const m = parseInt(tM.value||'0',10)||0;
+  const s = parseInt(tS.value||'0',10)||0;
+  const total = Math.min(h*3600 + m*60 + s, 24*3600);   // up to a day, if you insist
+  if (total > 0){
+    remaining = total;
+    maxEver = Math.max(1, remaining);
+    lastBreathDone = false;
+  } else {
+    remaining = 0; lastBreathDone = true;
+  }
+  lastWall = Date.now();
+  started = true;
+  reconcile(false);
+  refreshFollowers();
+  intro.classList.add('gone');
+  document.getElementById('give').classList.add('on');
+  timeInputs.forEach(i=>i.blur());
+}
+document.getElementById('begin').addEventListener('click', e=>{ e.stopPropagation(); begin(); });
+/* touching anywhere lets them live — except inside the numbers */
+intro.addEventListener('click', e=>{
+  if (e.target.tagName==='INPUT') return;
+  begin();
+});
+
+/* ═══════════════ hidden panel — shift+p ═══════════════ */
+let panelOn = false;
+const panel = document.getElementById('panel');
+window.addEventListener('keydown', e=>{
+  if (e.shiftKey && (e.key==='P'||e.key==='p') && document.activeElement.tagName!=='INPUT'){
+    panelOn = !panelOn;
+    panel.classList.toggle('on', panelOn);
+  }
+});
+document.getElementById('pSpeed').addEventListener('input', e=>{
+  speedMult = parseInt(e.target.value,10);
+  document.getElementById('pSpdVal').textContent = speedMult+'x';
+});
+document.getElementById('pIntake').addEventListener('input', e=>{
+  intakeAmt = parseInt(e.target.value,10);
+  document.getElementById('pIntakeVal').textContent = intakeAmt;
+});
+document.getElementById('pGrain').addEventListener('input', e=>{
+  grainAmt = parseInt(e.target.value,10);
+  document.getElementById('pGrainVal').textContent = grainAmt;
+});
+document.getElementById('pTick').addEventListener('input', e=>{
+  MIX.tick = parseInt(e.target.value,10);
+  document.getElementById('pTickVal').textContent = MIX.tick;
+});
+document.getElementById('pChoir').addEventListener('input', e=>{
+  MIX.choir = parseInt(e.target.value,10);
+  document.getElementById('pChoirVal').textContent = MIX.choir;
+});
+document.getElementById('pCello').addEventListener('input', e=>{
+  MIX.cello = parseInt(e.target.value,10);
+  document.getElementById('pCelloVal').textContent = MIX.cello;
+});
+document.getElementById('pCrackle').addEventListener('input', e=>{
+  MIX.crackle = parseInt(e.target.value,10);
+  document.getElementById('pCrackleVal').textContent = MIX.crackle;
+});
+
+/* a mildly upset experience */
+</script>
+</body>
+</html>
